@@ -1,0 +1,1 @@
+"""Local tender monitoring MVP."""

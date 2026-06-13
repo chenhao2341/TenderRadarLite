@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Hengyang Construction",
+    "source": "衡阳分平台",
+    "source_subtype": "建设工程交易",
+    "module": "app.adapters.hengyang_construction",
+    "class": "HengyangConstructionAdapter",
+    "enabled": true,
+    "url": "https://hengyang.hnsggzy.com/tradeApi/constructionTender/listByFile?regionCode=430400&current=1&size=10",
+    "region": "衡阳",
+    "pages_scanned": 3,
+    "page_size": 10
+  },
+  {
+    "name": "Hengyang Procurement",
+    "source": "衡阳分平台",
+    "source_subtype": "政府采购交易",
+    "module": "app.adapters.hengyang_procurement",
+    "class": "HengyangProcurementAdapter",
+    "enabled": false,
+    "url": "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430400&current=1&size=10",
+    "region": "衡阳"
+  }
+]
