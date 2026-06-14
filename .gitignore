@@ -13,3 +13,4 @@ reports/
 backup-*/
 backup-before-*/
 *.db
+examples/*.local.json
