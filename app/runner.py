@@ -9,6 +9,7 @@ from .config import DATA_DIR, REPORT_DIR, ensure_runtime_dirs, load_keywords, lo
 from .dedupe import build_dedupe_key
 from .feishu import FeishuClient
 from .fetcher import Fetcher
+from .html_report import open_html_report, write_html_report
 from .keywords import build_keyword_text, match_keywords
 from .logging_utils import setup_logging
 from .models import Notice
@@ -136,7 +137,11 @@ def _feishu_can_send_bot(client: Any) -> bool:
     return True
 
 
-def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> list[RunSummary]:
+def run_once(
+    enable_feishu: bool = True,
+    structured_preview: bool = False,
+    html_report: bool = False,
+) -> list[RunSummary]:
     ensure_runtime_dirs()
     logger = setup_logging()
     keywords = load_keywords()
@@ -149,11 +154,10 @@ def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> li
     fetcher = Fetcher(logger)
     results: list[RunSummary] = []
     preview_notices: list[Notice] = []
+    html_notices: list[Notice] = []
+    enabled_sources = [source for source in load_sources() if source.get("enabled", True)]
 
-    for source in load_sources():
-        if not source.get("enabled", True):
-            continue
-
+    for source in enabled_sources:
         adapter = _build_adapter(source, fetcher)
         run_id = storage.start_run(source["name"])
         inserted = 0
@@ -194,6 +198,8 @@ def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> li
 
                 if structured_preview:
                     preview_notices.append(notice)
+                if html_report:
+                    html_notices.append(notice)
 
                 if not is_new:
                     continue
@@ -305,7 +311,15 @@ def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> li
             )
 
     if structured_preview:
-        write_structured_preview_report(REPORT_DIR / "新来源结构化抓取预览.md", preview_notices, keywords)
+        write_structured_preview_report(structured_preview_report_path(), preview_notices, keywords)
+    if html_report:
+        report_path = write_html_report(
+            html_report_path(),
+            html_notices,
+            source_count=len(enabled_sources),
+        )
+        if not open_html_report(report_path):
+            logger.warning("failed to auto-open local HTML report: %s", report_path)
 
     return results
 
@@ -377,6 +391,10 @@ def reset_pilot_sync_state(pilot_notice_ids_file: str | Path) -> ResetPilotSyncS
 
 def structured_preview_report_path() -> Path:
     return REPORT_DIR / "structured-preview.md"
+
+
+def html_report_path() -> Path:
+    return REPORT_DIR / "latest.html"
 
 
 def run_pilot_notice_whitelist(

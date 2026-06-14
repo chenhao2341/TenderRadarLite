@@ -9,7 +9,8 @@ data/*
 !data/.gitkeep
 logs/*
 !logs/.gitkeep
-reports/
+reports/*
+!reports/.gitkeep
 backup-*/
 backup-before-*/
 *.db

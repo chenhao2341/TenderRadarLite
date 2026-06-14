@@ -400,6 +400,68 @@ class OptionalFeishuOutputTests(unittest.TestCase):
         feishu_client.return_value.write_notice.assert_not_called()
         feishu_client.return_value.send_summary.assert_not_called()
 
+    def test_run_once_generates_local_html_without_feishu_client(self) -> None:
+        temp_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+        (temp_dir / "logs").mkdir(parents=True, exist_ok=True)
+        source = {
+            "name": "Hengyang Construction",
+            "enabled": True,
+            "module": "unused",
+            "class": "unused",
+            "url": "https://example.com",
+            "region": "Hengyang",
+            "source": "source",
+            "source_subtype": "construction",
+        }
+        notice = Notice(
+            source="source",
+            source_subtype="construction",
+            dedupe_key="",
+            section_id="sec-2",
+            project_name="Watch Project",
+            notice_id="notice-2",
+            notice_title="Watch Project Notice",
+            notice_type="ZHAOBIAO_NOTICE",
+            notice_publish_time="2026-06-12 10:00:00",
+            publish_time="2026-06-12 10:00:00",
+            content_summary="renovation design service",
+            original_url="https://example.com/detail",
+            fetched_at="2026-06-13 12:00:00",
+        )
+
+        with (
+            mock.patch("app.runner.DATA_DIR", temp_dir / "data"),
+            mock.patch("app.runner.REPORT_DIR", temp_dir / "reports"),
+            mock.patch("app.logging_utils.LOG_DIR", temp_dir / "logs"),
+            mock.patch("app.runner.load_sources", return_value=[source]),
+            mock.patch("app.runner._build_adapter", return_value=_LocalAdapter([notice])),
+            mock.patch("app.runner.write_html_report") as write_html_report,
+            mock.patch("app.runner.open_html_report", return_value=True) as open_html_report,
+            mock.patch("app.runner.FeishuClient") as feishu_client,
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FEISHU_APP_ID": "",
+                    "FEISHU_APP_SECRET": "",
+                    "FEISHU_CHAT_ID": "",
+                    "FEISHU_BITABLE_URL": "",
+                    "FEISHU_WEBHOOK_URL": "",
+                    "FEISHU_BITABLE_APP_TOKEN": "",
+                    "FEISHU_BITABLE_TABLE_ID": "",
+                },
+                clear=False,
+            ),
+        ):
+            write_html_report.return_value = temp_dir / "reports" / "latest.html"
+            results = run_once(enable_feishu=False, html_report=True)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].inserted_count, 1)
+        feishu_client.assert_not_called()
+        write_html_report.assert_called_once()
+        open_html_report.assert_called_once()
+
 
 class SourceConfigTests(unittest.TestCase):
     def test_procurement_source_is_disabled_in_formal_run(self) -> None:

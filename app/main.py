@@ -7,6 +7,7 @@ from .feishu import FeishuClient, FeishuConfigError
 from .logging_utils import setup_logging
 from .runner import (
     backfill_feishu,
+    html_report_path,
     reset_pilot_sync_state,
     run_once,
     run_pilot_notice_whitelist,
@@ -29,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--local-structured-preview",
         action="store_true",
         help="Fetch new sources and generate local structured preview without Feishu",
+    )
+    parser.add_argument(
+        "--local-html",
+        action="store_true",
+        help="Fetch new sources and generate a local HTML report without Feishu",
     )
     parser.add_argument("--pilot-notice-ids-file", help="Run notice_id whitelist preview or execute flow")
     parser.add_argument("--dry-run", action="store_true", help="Preview whitelist notices without side effects")
@@ -126,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         args.reset_pilot_sync_state,
         args.local_only,
         args.local_structured_preview,
+        args.local_html,
     ]
     if sum(1 for flag in selected if flag) > 1:
         parser.error("only one primary command may run at a time")
@@ -146,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         args.test_feishu_bot,
         args.local_only,
         args.local_structured_preview,
+        args.local_html,
     ]
     if args.pilot_notice_ids_file and any(selected_without_pilot_file):
         parser.error("--pilot-notice-ids-file cannot be combined with other entrypoints")
@@ -159,6 +167,12 @@ def main(argv: list[str] | None = None) -> int:
         results = run_once(enable_feishu=False, structured_preview=True)
         _print_run_results(results)
         print(f"preview_report: {structured_preview_report_path()}")
+        return _return_code_for_run(results, logger)
+
+    if args.local_html:
+        results = run_once(enable_feishu=False, html_report=True)
+        _print_run_results(results)
+        print(f"html_report: {html_report_path()}")
         return _return_code_for_run(results, logger)
 
     if args.init_feishu_schema or args.init_feishu_fields:

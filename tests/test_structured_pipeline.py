@@ -526,6 +526,19 @@ class MainEntryTests(unittest.TestCase):
         self.assertFalse(kwargs["enable_feishu"])
         self.assertTrue(kwargs["structured_preview"])
 
+    def test_local_html_runs_without_feishu(self) -> None:
+        from app.main import main
+
+        with mock.patch("app.main.run_once") as run_once:
+            run_once.return_value = []
+            exit_code = main(["--local-html"])
+
+        self.assertEqual(exit_code, 0)
+        run_once.assert_called_once()
+        kwargs = run_once.call_args.kwargs
+        self.assertFalse(kwargs["enable_feishu"])
+        self.assertTrue(kwargs["html_report"])
+
     def test_init_feishu_fields_alias_calls_init_schema(self) -> None:
         from app.main import main
 
@@ -546,6 +559,69 @@ class MainEntryTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         fake_client.init_schema.assert_called_once()
+
+
+class HtmlReportTests(unittest.TestCase):
+    def _sample_notice(self, lead_tier: str, project_name: str, suffix: str) -> Notice:
+        return Notice(
+            source="source",
+            source_subtype="construction",
+            dedupe_key=f"source|{suffix}",
+            section_id=f"section-{suffix}",
+            project_name=project_name,
+            notice_id=f"notice-{suffix}",
+            notice_type="Tender Notice",
+            purchaser_or_tenderer="Tenderer",
+            agency="Agency",
+            region="Hengyang",
+            publish_time="2026-06-15 10:00:00",
+            bid_open_or_response_deadline="2026-06-20 09:00:00",
+            budget_amount="1000",
+            ceiling_price="900",
+            content_summary="Content summary",
+            qualification_summary="Qualification summary",
+            employee_readable_url=f"https://example.com/{suffix}",
+            hit_keywords=["design"],
+            lead_tier=lead_tier,
+            lead_reason=f"{lead_tier} reason",
+            fetched_at="2026-06-15 12:00:00",
+        )
+
+    def test_write_html_report_renders_sections_and_fields(self) -> None:
+        from app.html_report import write_html_report
+
+        notices = [
+            self._sample_notice("DIRECT", "Direct Project", "direct"),
+            self._sample_notice("WATCHLIST", "Watch Project", "watch"),
+            self._sample_notice("EXCLUDE", "Exclude Project", "exclude"),
+        ]
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            written_path = write_html_report(report_path, notices, source_count=1, generated_at="2026-06-15 12:00:00")
+
+            self.assertEqual(written_path, report_path)
+            self.assertTrue(report_path.exists())
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("TenderRadarLite 本地招投标线索报告", html)
+        self.assertIn(">DIRECT<", html)
+        self.assertIn(">WATCHLIST<", html)
+        self.assertIn(">EXCLUDE<", html)
+        self.assertIn("Direct Project", html)
+        self.assertIn("DIRECT reason", html)
+        self.assertIn('href="https://example.com/direct"', html)
+
+    def test_write_html_report_renders_empty_state(self) -> None:
+        from app.html_report import write_html_report
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [], source_count=0, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("本轮未发现新线索", html)
+        self.assertIn("检查来源配置或稍后再运行", html)
 
 
 if __name__ == "__main__":
