@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import json
 import logging
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
 import requests
 
+from .config import FeishuEnvConfig, load_feishu_env
 from .models import Notice
 
 
@@ -66,12 +67,15 @@ class FeishuConfigError(RuntimeError):
 class FeishuClient:
     def __init__(self, logger: logging.Logger) -> None:
         self.logger = logger
-        self.app_id = os.getenv("FEISHU_APP_ID", "").strip()
-        self.app_secret = os.getenv("FEISHU_APP_SECRET", "").strip()
-        self.bitable_url = os.getenv("FEISHU_BITABLE_URL", "").strip()
-        self.bitable_app_token = os.getenv("FEISHU_BITABLE_APP_TOKEN", "").strip()
-        self.bitable_table_id = os.getenv("FEISHU_BITABLE_TABLE_ID", "").strip()
-        self.webhook_url = os.getenv("FEISHU_WEBHOOK_URL", "").strip()
+        self.config: FeishuEnvConfig = load_feishu_env()
+        self.app_id = self.config.app_id
+        self.app_secret = self.config.app_secret
+        self.bitable_url = self.config.bitable_url
+        self.bitable_app_token = self.config.bitable_app_token
+        self.bitable_table_id = self.config.bitable_table_id
+        self.webhook_url = self.config.webhook_url
+        self.bot_mode = self.config.bot_mode
+        self.chat_id = self.config.chat_id
 
     def get_env_status_lines(self) -> list[str]:
         return [
@@ -81,16 +85,21 @@ class FeishuClient:
             f"FEISHU_WEBHOOK_URL: {'已配置' if self.webhook_url else '未配置'}",
             f"FEISHU_BITABLE_APP_TOKEN: {'已配置' if self.bitable_app_token else '未配置'} (fallback)",
             f"FEISHU_BITABLE_TABLE_ID: {'已配置' if self.bitable_table_id else '未配置'} (fallback)",
+            f"FEISHU_BOT_MODE: {self.bot_mode}",
+            f"FEISHU_CHAT_ID: {'已配置' if self.chat_id else '未配置'}",
         ]
 
     def can_write_bitable(self) -> bool:
         return bool((self.bitable_url or self.bitable_app_token) and self.app_id and self.app_secret)
 
     def can_send_webhook(self) -> bool:
-        return bool(self.webhook_url)
+        return self.bot_mode == "webhook" and bool(self.webhook_url)
+
+    def can_send_app_bot(self) -> bool:
+        return self.bot_mode == "app" and bool(self.app_id and self.app_secret and self.chat_id)
 
     def has_any_output(self) -> bool:
-        return self.can_write_bitable() or self.can_send_webhook()
+        return self.can_write_bitable() or self.can_send_webhook() or self.can_send_app_bot()
 
     def _mask(self, value: str, prefix: int = 4, suffix: int = 4) -> str:
         if not value:
@@ -112,6 +121,18 @@ class FeishuClient:
         if not self.webhook_url:
             self._raise_missing("FEISHU_WEBHOOK_URL", "请先配置群机器人 Webhook URL")
         return self.webhook_url
+
+    def _require_bot_mode(self) -> str:
+        if self.bot_mode not in {"webhook", "app"}:
+            raise FeishuConfigError("FEISHU_BOT_MODE 仅支持 webhook 或 app")
+        return self.bot_mode
+
+    def _require_chat_id(self) -> str:
+        if not self.chat_id:
+            raise FeishuConfigError(
+                "FEISHU_CHAT_ID 未配置：app 模式请先执行 python run_mvp.py --list-feishu-chats"
+            )
+        return self.chat_id
 
     def parse_bitable_target_from_env(self) -> tuple[str, str | None]:
         if self.bitable_url:
@@ -142,8 +163,9 @@ class FeishuClient:
         *,
         headers: dict[str, str] | None = None,
         json_body: dict | None = None,
+        params: dict[str, str | int] | None = None,
     ) -> dict:
-        response = requests.request(method, url, headers=headers, json=json_body, timeout=20)
+        response = requests.request(method, url, headers=headers, json=json_body, params=params, timeout=20)
         response.raise_for_status()
         data = response.json()
         if isinstance(data, dict) and data.get("code", 0) not in (0, None):
@@ -376,6 +398,60 @@ class FeishuClient:
             "原始接口链接": raw_url,
         }
 
+    def list_chats(self) -> list[dict[str, str]]:
+        token = self._get_tenant_access_token()
+        page_token = ""
+        chats: list[dict[str, str]] = []
+        while True:
+            params: dict[str, str | int] = {"page_size": 100}
+            if page_token:
+                params["page_token"] = page_token
+            data = self._api_request(
+                "GET",
+                "https://open.feishu.cn/open-apis/im/v1/chats",
+                headers=self._auth_headers(token),
+                params=params,
+            )
+            payload = data.get("data", {})
+            for item in payload.get("items", []):
+                chats.append(
+                    {
+                        "name": str(item.get("name") or ""),
+                        "chat_id": str(item.get("chat_id") or ""),
+                        "description": str(item.get("description") or ""),
+                    }
+                )
+            if not payload.get("has_more"):
+                break
+            page_token = str(payload.get("page_token") or "")
+            if not page_token:
+                break
+        return chats
+
+    def send_app_message(self, text: str) -> bool:
+        self._require_app_credentials()
+        chat_id = self._require_chat_id()
+        token = self._get_tenant_access_token()
+        payload = {
+            "receive_id": chat_id,
+            "msg_type": "text",
+            "content": json.dumps({"text": text}, ensure_ascii=False),
+        }
+        self._api_request(
+            "POST",
+            "https://open.feishu.cn/open-apis/im/v1/messages",
+            headers=self._auth_headers(token),
+            params={"receive_id_type": "chat_id"},
+            json_body=payload,
+        )
+        return True
+
+    def send_bot_message(self, text: str) -> bool:
+        mode = self._require_bot_mode()
+        if mode == "webhook":
+            return self.send_text_message(text)
+        return self.send_app_message(text)
+
     def send_test_webhook(self) -> bool:
         return self.send_text_message("TenderRadarLite test: Feishu webhook is reachable")
 
@@ -400,7 +476,7 @@ class FeishuClient:
         for notice in notices[:max_examples]:
             lines.extend(self._build_notice_message_lines(notice))
             lines.append("")
-        return self.send_text_message("\n".join(lines).rstrip())
+        return self.send_bot_message("\n".join(lines).rstrip())
 
     def _build_notice_message_lines(self, notice: Notice) -> list[str]:
         employee_url = notice.employee_readable_url or ""

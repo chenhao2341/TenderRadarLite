@@ -18,6 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--init-feishu-schema", action="store_true", help="Initialize Feishu schema")
     parser.add_argument("--test-feishu-write", action="store_true", help="Write one Feishu test record")
     parser.add_argument("--test-webhook", action="store_true", help="Send one Feishu webhook test message")
+    parser.add_argument("--list-feishu-chats", action="store_true", help="List visible Feishu chats for app bot mode")
+    parser.add_argument("--test-feishu-bot", action="store_true", help="Send one Feishu bot test message with current bot mode")
     parser.add_argument("--backfill-feishu", action="store_true", help="Backfill matching SQLite history to Feishu")
     parser.add_argument("--local-only", action="store_true", help="Fetch and dedupe locally without Feishu")
     parser.add_argument(
@@ -34,6 +36,14 @@ def build_parser() -> argparse.ArgumentParser:
 def _print_env_status(client: FeishuClient) -> None:
     for line in client.get_env_status_lines():
         print(line)
+
+
+def _print_feishu_chats(chats) -> None:
+    if not chats:
+        print("no chats found")
+        return
+    for item in chats:
+        print(f"name={item.get('name', '')}, chat_id={item.get('chat_id', '')}")
 
 
 def _print_run_results(results) -> None:
@@ -106,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         args.init_feishu_schema,
         args.test_feishu_write,
         args.test_webhook,
+        args.list_feishu_chats,
+        args.test_feishu_bot,
         args.backfill_feishu,
         args.local_only,
         args.local_structured_preview,
@@ -186,6 +198,32 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Webhook test failed: {exc}")
             return 1
         print("Webhook test message sent")
+        return 0
+
+    if args.list_feishu_chats:
+        client = FeishuClient(logger)
+        try:
+            chats = client.list_chats()
+        except FeishuConfigError as exc:
+            print(str(exc))
+            return 2
+        except Exception as exc:
+            print(f"Feishu chat list failed: {exc}")
+            return 1
+        _print_feishu_chats(chats)
+        return 0
+
+    if args.test_feishu_bot:
+        client = FeishuClient(logger)
+        try:
+            client.send_bot_message("TenderRadarLite 应用机器人发送测试成功")
+        except FeishuConfigError as exc:
+            print(str(exc))
+            return 2
+        except Exception as exc:
+            print(f"Feishu bot test failed: {exc}")
+            return 1
+        print("bot test message sent")
         return 0
 
     if args.backfill_feishu:

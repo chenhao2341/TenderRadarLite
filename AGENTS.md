@@ -15,6 +15,10 @@
 - 白名单验收入口：
   - `python run_mvp.py --pilot-notice-ids-file <配置文件> --dry-run`
   - `python run_mvp.py --pilot-notice-ids-file <配置文件> --execute`
+- 飞书群列表：
+  - `python run_mvp.py --list-feishu-chats`
+- 飞书机器人测试：
+  - `python run_mvp.py --test-feishu-bot`
 
 ## 3. 工程规则
 
@@ -46,3 +50,12 @@
 - AI API 尚未接入
 - HTML 页面尚未开发
 - Windows 计划任务不自动创建、不自动启用
+
+## 6. Feishu Bot Boundary
+
+- `FEISHU_BOT_MODE=webhook` 使用 `FEISHU_WEBHOOK_URL`
+- `FEISHU_BOT_MODE=app` 使用 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_CHAT_ID`
+- 当前主动发群消息不需要长连接
+- 当前主动发群消息不需要事件订阅
+- 当前范围只是应用机器人主动发消息
+- 只有后续要接收消息、做 AI 对话或处理事件回调时，才需要事件订阅或长连接
