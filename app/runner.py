@@ -47,6 +47,13 @@ class BackfillSummary:
     written_count: int
     notified: bool
     duplicate_notice_sent: bool
+    bot_sent_count: int
+
+
+@dataclass
+class ResetPilotSyncSummary:
+    targeted_count: int
+    reset_count: int
 
 
 @dataclass
@@ -117,6 +124,16 @@ def _feishu_can_write_bitable(client: Any) -> bool:
 def _feishu_can_send_webhook(client: Any) -> bool:
     method = getattr(client, "can_send_webhook", None)
     return method() if callable(method) else True
+
+
+def _feishu_can_send_bot(client: Any) -> bool:
+    webhook_method = getattr(client, "can_send_webhook", None)
+    app_method = getattr(client, "can_send_app_bot", None)
+    webhook_enabled = webhook_method() if callable(webhook_method) else False
+    app_enabled = app_method() if callable(app_method) else False
+    if callable(webhook_method) or callable(app_method):
+        return bool(webhook_enabled or app_enabled)
+    return True
 
 
 def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> list[RunSummary]:
@@ -191,11 +208,11 @@ def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> li
                     else:
                         bitable_written = True
                         feishu_written += 1
-                if feishu is not None and _feishu_can_send_webhook(feishu) and notice.lead_tier == "DIRECT":
+                if feishu is not None and _feishu_can_send_bot(feishu) and notice.lead_tier == "DIRECT":
                     if bitable_written or not _feishu_can_write_bitable(feishu):
                         direct_notices.append(notice)
 
-            if feishu is not None and _feishu_can_send_webhook(feishu) and direct_notices:
+            if feishu is not None and _feishu_can_send_bot(feishu) and direct_notices:
                 try:
                     feishu.send_summary(direct_notices)
                 except Exception as exc:
@@ -293,15 +310,20 @@ def run_once(enable_feishu: bool = True, structured_preview: bool = False) -> li
     return results
 
 
-def backfill_feishu() -> BackfillSummary:
+def backfill_feishu(pilot_notice_ids_file: str | Path | None = None) -> BackfillSummary:
     ensure_runtime_dirs()
     logger = setup_logging()
     storage = Storage(DATA_DIR / "bids.db")
     total_history_count, hit_history_count = storage.get_history_stats()
-    pending_notices = storage.get_pending_backfill_notices()
+    if pilot_notice_ids_file:
+        notice_ids = load_pilot_notice_ids(pilot_notice_ids_file)
+        pending_notices = storage.get_pilot_pending_feishu_notices(notice_ids)
+    else:
+        notice_ids = []
+        pending_notices = storage.get_pending_backfill_notices()
 
-    if hit_history_count == 0:
-        return BackfillSummary(total_history_count, hit_history_count, 0, 0, False, False)
+    if not pilot_notice_ids_file and hit_history_count == 0:
+        return BackfillSummary(total_history_count, hit_history_count, 0, 0, False, False, 0)
 
     feishu = FeishuClient(logger)
     written_notices: list[Notice] = []
@@ -311,19 +333,46 @@ def backfill_feishu() -> BackfillSummary:
         except Exception as exc:
             logger.error("backfill bitable write failed: %s", exc)
             continue
-        storage.mark_notice_backfilled(build_dedupe_key(notice))
+        if pilot_notice_ids_file:
+            storage.mark_pilot_feishu_written([build_dedupe_key(notice)])
+        else:
+            storage.mark_notice_backfilled(build_dedupe_key(notice))
         written_notices.append(notice)
 
     notified = False
-    if written_notices:
+    bot_sent_count = 0
+    if pilot_notice_ids_file:
+        notices_to_notify = storage.get_pilot_pending_bot_notices(notice_ids)
+    else:
+        notices_to_notify = written_notices
+    if notices_to_notify and _feishu_can_send_bot(feishu):
         try:
-            feishu.send_summary(written_notices, summary_title="TenderRadarLite backfill completed", max_examples=3)
+            feishu.send_summary(notices_to_notify, summary_title="TenderRadarLite backfill completed", max_examples=3)
         except Exception as exc:
             logger.error("backfill webhook notify failed: %s", exc)
         else:
             notified = True
+            bot_sent_count = len(notices_to_notify)
+            if pilot_notice_ids_file:
+                storage.mark_pilot_webhook_sent([notice.dedupe_key for notice in notices_to_notify])
 
-    return BackfillSummary(total_history_count, hit_history_count, len(pending_notices), len(written_notices), notified, False)
+    return BackfillSummary(
+        total_history_count,
+        hit_history_count,
+        len(pending_notices),
+        len(written_notices),
+        notified,
+        False,
+        bot_sent_count,
+    )
+
+
+def reset_pilot_sync_state(pilot_notice_ids_file: str | Path) -> ResetPilotSyncSummary:
+    ensure_runtime_dirs()
+    storage = Storage(DATA_DIR / "bids.db")
+    notice_ids = load_pilot_notice_ids(pilot_notice_ids_file)
+    reset_count = storage.reset_pilot_sync_state(notice_ids)
+    return ResetPilotSyncSummary(targeted_count=len(notice_ids), reset_count=reset_count)
 
 
 def structured_preview_report_path() -> Path:
@@ -450,14 +499,16 @@ def run_pilot_notice_whitelist(
             feishu.write_notice(notice)
             feishu_written_count += 1
             bitable_written = True
-        if feishu is not None and _feishu_can_send_webhook(feishu) and notice.lead_tier == "DIRECT":
+            storage.mark_pilot_feishu_written([notice.dedupe_key])
+        if feishu is not None and _feishu_can_send_bot(feishu) and notice.lead_tier == "DIRECT":
             if bitable_written or not _feishu_can_write_bitable(feishu):
                 direct_notices_to_notify.append(notice)
 
-    if execute and feishu is not None and _feishu_can_send_webhook(feishu) and direct_notices_to_notify:
+    if execute and feishu is not None and _feishu_can_send_bot(feishu) and direct_notices_to_notify:
         feishu.send_summary(direct_notices_to_notify)
         webhook_sent_count = 1
         bot_notice_ids = [notice.notice_id for notice in direct_notices_to_notify]
+        storage.mark_pilot_webhook_sent([notice.dedupe_key for notice in direct_notices_to_notify])
 
     return PilotNoticeWhitelistSummary(
         notice_ids_total=len(allowed_notice_ids),

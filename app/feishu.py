@@ -16,39 +16,20 @@ BITABLE_TABLE_NAME = "TenderRadarLite"
 PRIMARY_FIELD_NAME = "项目名称"
 OFFICIAL_PLATFORM_URL = "https://hengyang.hnsggzy.com/"
 SCHEMA_FIELDS = [
-    "来源网站",
-    "来源子类",
-    "唯一键",
-    "地区",
-    "发布时间",
-    "原文链接",
-    "抓取时间",
-    "是否新增",
-    "命中关键词",
-    "人工判断",
-    "标段名称",
+    "商机层级",
     "公告类型",
-    "项目编号",
+    "发布时间",
+    "地区",
     "招标人或采购单位",
     "代理机构",
-    "文件获取截止时间",
-    "开标或响应截止时间",
     "预算金额",
     "最高限价",
-    "采购或招标方式",
-    "项目内容摘要",
-    "资质要求摘要",
-    "是否接受联合体",
-    "是否有附件",
-    "附件数量",
-    "商机层级",
+    "截止时间",
+    "命中关键词",
     "分类理由",
-    "正向信号",
-    "排除信号",
-    "验收标记",
-    "官方平台入口",
-    "建议搜索关键词",
-    "原始接口链接",
+    "原文链接",
+    "抓取时间",
+    "唯一键",
 ]
 TEXT_FIELD_TYPE = 1
 
@@ -260,6 +241,7 @@ class FeishuClient:
         target = self._resolve_target_table(token, app_token, preferred_table_id)
         fields = self._list_fields(token, target.app_token, target.table_id)
         existing_names = [field.get("field_name", "") for field in fields]
+        existing_field_count = len(existing_names)
         created_fields: list[str] = []
         renamed_fields: list[str] = []
         failed_fields: list[str] = []
@@ -272,8 +254,11 @@ class FeishuClient:
                     self._update_field(token, target.app_token, target.table_id, primary_field["field_id"], PRIMARY_FIELD_NAME)
                     renamed_fields.append(f"{current_name} -> {PRIMARY_FIELD_NAME}")
                     existing_names = [PRIMARY_FIELD_NAME if name == current_name else name for name in existing_names]
-                except Exception:
+                except Exception as exc:
                     failed_fields.append(f"rename:{current_name}")
+                    raise RuntimeError(f"Primary field rename failed: {exc}") from exc
+        elif PRIMARY_FIELD_NAME not in existing_names:
+            raise RuntimeError("Primary field is missing and could not be resolved")
 
         for field_name in SCHEMA_FIELDS:
             if field_name in existing_names:
@@ -281,6 +266,7 @@ class FeishuClient:
             try:
                 self._create_field(token, target.app_token, target.table_id, field_name)
                 created_fields.append(field_name)
+                existing_names.append(field_name)
             except Exception:
                 failed_fields.append(field_name)
 
@@ -289,6 +275,7 @@ class FeishuClient:
             "table_id": target.table_id,
             "table_name": target.table_name or BITABLE_TABLE_NAME,
             "existing_fields": existing_names,
+            "existing_field_count": existing_field_count,
             "created_fields": created_fields,
             "renamed_fields": renamed_fields,
             "failed_fields": failed_fields,
@@ -300,17 +287,16 @@ class FeishuClient:
         payload = {
             "fields": {
                 "项目名称": "【测试】TenderRadarLite Feishu output",
-                "来源网站": "本地测试",
-                "地区": "衡阳",
+                "商机层级": "WATCHLIST",
+                "公告类型": "测试公告",
                 "发布时间": "测试",
+                "地区": "衡阳",
+                "截止时间": "测试",
+                "命中关键词": "测试",
+                "分类理由": "测试",
                 "原文链接": OFFICIAL_PLATFORM_URL,
                 "抓取时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "是否新增": "测试",
-                "命中关键词": "测试",
-                "人工判断": "待确认",
-                "官方平台入口": OFFICIAL_PLATFORM_URL,
-                "建议搜索关键词": "TenderRadarLite Feishu output",
-                "原始接口链接": "",
+                "唯一键": "test-key",
             }
         }
         data = self._api_request(
@@ -356,46 +342,24 @@ class FeishuClient:
         manual_judgement: str | None = None,
         pilot_flag: str = "",
     ) -> dict[str, str]:
-        newness = newness_value if newness_value is not None else (notice.newness_label if notice.newness_label else ("是" if notice.is_new else "否"))
-        manual_value = manual_judgement if manual_judgement is not None else notice.manual_judgement
         employee_url = notice.employee_readable_url or ""
-        raw_url = notice.raw_api_url or notice.original_url or ""
-        search_keyword = _build_search_keyword(notice)
+        deadline = notice.bid_open_or_response_deadline or notice.file_get_deadline or ""
         return {
             "项目名称": notice.project_name or notice.title,
-            "来源网站": notice.source_site,
-            "来源子类": notice.source_subtype,
-            "唯一键": notice.dedupe_key,
-            "地区": notice.region,
-            "发布时间": notice.published_at,
-            "原文链接": employee_url or OFFICIAL_PLATFORM_URL,
-            "抓取时间": notice.fetched_at,
-            "是否新增": newness,
-            "命中关键词": "、".join(notice.hit_keywords),
-            "人工判断": manual_value,
-            "标段名称": notice.section_name,
+            "商机层级": notice.lead_tier,
             "公告类型": notice.notice_type,
-            "项目编号": notice.project_code,
+            "发布时间": notice.published_at,
+            "地区": notice.region,
             "招标人或采购单位": notice.purchaser_or_tenderer,
             "代理机构": notice.agency,
-            "文件获取截止时间": notice.file_get_deadline,
-            "开标或响应截止时间": notice.bid_open_or_response_deadline,
             "预算金额": notice.budget_amount,
             "最高限价": notice.ceiling_price,
-            "采购或招标方式": notice.procurement_method,
-            "项目内容摘要": notice.content_summary,
-            "资质要求摘要": notice.qualification_summary,
-            "是否接受联合体": notice.accepts_consortium or "未提取到",
-            "是否有附件": "是" if notice.has_attachment else "否",
-            "附件数量": str(notice.attachment_count),
-            "商机层级": notice.lead_tier,
+            "截止时间": deadline,
+            "命中关键词": "、".join(notice.hit_keywords),
             "分类理由": notice.lead_reason,
-            "正向信号": "、".join(notice.matched_positive_signals),
-            "排除信号": "、".join(notice.matched_negative_signals),
-            "验收标记": pilot_flag,
-            "官方平台入口": OFFICIAL_PLATFORM_URL,
-            "建议搜索关键词": search_keyword,
-            "原始接口链接": raw_url,
+            "原文链接": employee_url or OFFICIAL_PLATFORM_URL,
+            "抓取时间": notice.fetched_at,
+            "唯一键": notice.dedupe_key,
         }
 
     def list_chats(self) -> list[dict[str, str]]:

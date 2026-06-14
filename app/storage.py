@@ -440,11 +440,48 @@ class Storage:
         notices.sort(key=lambda notice: (order_map.get(notice.project_name, 999), notice.dedupe_key))
         return notices[:limit]
 
+    def get_pilot_pending_feishu_notices(self, notice_ids: list[str]) -> list[Notice]:
+        return self._get_pilot_notices_by_ids(
+            notice_ids,
+            extra_where="""
+                  AND lead_tier IN ('DIRECT', 'WATCHLIST')
+                  AND pilot_feishu_written_at IS NULL
+            """,
+        )
+
+    def get_pilot_pending_bot_notices(self, notice_ids: list[str]) -> list[Notice]:
+        return self._get_pilot_notices_by_ids(
+            notice_ids,
+            extra_where="""
+                  AND lead_tier = 'DIRECT'
+                  AND pilot_feishu_written_at IS NOT NULL
+                  AND pilot_webhook_sent_at IS NULL
+            """,
+        )
+
     def mark_pilot_feishu_written(self, dedupe_keys: Iterable[str]) -> None:
         self._mark_timestamp_for_keys("pilot_feishu_written_at", dedupe_keys)
 
     def mark_pilot_webhook_sent(self, dedupe_keys: Iterable[str]) -> None:
         self._mark_timestamp_for_keys("pilot_webhook_sent_at", dedupe_keys)
+
+    def reset_pilot_sync_state(self, notice_ids: list[str]) -> int:
+        ids = [str(item).strip() for item in notice_ids if str(item).strip()]
+        if not ids:
+            return 0
+        placeholders = ",".join("?" for _ in ids)
+        with self._connect() as conn:
+            cursor = conn.execute(
+                f"""
+                UPDATE bids
+                SET pilot_feishu_written_at = NULL,
+                    pilot_webhook_sent_at = NULL
+                WHERE notice_id IN ({placeholders})
+                """,
+                ids,
+            )
+            conn.commit()
+            return int(cursor.rowcount or 0)
 
     def get_latest_notices(self, source_subtype: str, limit: int) -> list[Notice]:
         with self._connect() as conn:
@@ -478,6 +515,30 @@ class Storage:
                 (now, *keys),
             )
             conn.commit()
+
+    def _get_pilot_notices_by_ids(self, notice_ids: list[str], *, extra_where: str = "") -> list[Notice]:
+        ids = [str(item).strip() for item in notice_ids if str(item).strip()]
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT source, source_subtype, dedupe_key, section_id, notice_id, notice_title, notice_publish_time,
+                       project_name, section_name, notice_type, project_code, purchaser_or_tenderer, agency, region,
+                       publish_time, file_get_deadline, bid_open_or_response_deadline, budget_amount, ceiling_price,
+                       procurement_method, content_summary, qualification_summary, accepts_consortium,
+                       original_url, employee_readable_url, raw_api_url, has_attachment, attachment_count,
+                       fetched_at, hit_keywords, manual_judgement, source_site, title, published_at, source_url,
+                       lead_tier, lead_reason, matched_positive_signals, matched_negative_signals
+                FROM bids
+                WHERE notice_id IN ({placeholders})
+                {extra_where}
+                ORDER BY id
+                """,
+                ids,
+            ).fetchall()
+        return [self._row_to_notice(row) for row in rows]
 
     def _row_to_notice(self, row: tuple) -> Notice:
         hit_keywords = [item.strip() for item in (row[29] or "").split(",") if item.strip()]

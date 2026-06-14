@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from app.feishu import OFFICIAL_PLATFORM_URL, SCHEMA_FIELDS, FeishuClient
+from app.feishu import OFFICIAL_PLATFORM_URL, PRIMARY_FIELD_NAME, SCHEMA_FIELDS, FeishuClient
 from app.models import Notice
 from app.storage import Storage
 
@@ -314,34 +314,26 @@ class KeywordCoverageTests(unittest.TestCase):
 
 
 class FeishuSchemaTests(unittest.TestCase):
-    def test_schema_fields_include_link_and_business_columns(self) -> None:
-        for field in [
-            "来源子类",
-            "唯一键",
-            "标段名称",
-            "公告类型",
-            "项目编号",
-            "招标人或采购单位",
-            "代理机构",
-            "文件获取截止时间",
-            "开标或响应截止时间",
-            "预算金额",
-            "最高限价",
-            "采购或招标方式",
-            "项目内容摘要",
-            "资质要求摘要",
-            "是否接受联合体",
-            "是否有附件",
-            "附件数量",
-            "商机层级",
-            "分类理由",
-            "正向信号",
-            "排除信号",
-            "官方平台入口",
-            "建议搜索关键词",
-            "原始接口链接",
-        ]:
-            self.assertIn(field, SCHEMA_FIELDS)
+    def test_schema_fields_match_clean_table_layout(self) -> None:
+        self.assertEqual(
+            SCHEMA_FIELDS,
+            [
+                "商机层级",
+                "公告类型",
+                "发布时间",
+                "地区",
+                "招标人或采购单位",
+                "代理机构",
+                "预算金额",
+                "最高限价",
+                "截止时间",
+                "命中关键词",
+                "分类理由",
+                "原文链接",
+                "抓取时间",
+                "唯一键",
+            ],
+        )
 
     def test_notice_fields_use_direct_detail_url_when_available(self) -> None:
         client = FeishuClient(mock.Mock())
@@ -353,19 +345,43 @@ class FeishuSchemaTests(unittest.TestCase):
             project_name="Project One",
             notice_type="Tender Notice",
             purchaser_or_tenderer="Purchaser",
+            agency="Agency",
             region="Hengyang",
-            content_summary="content summary",
-            qualification_summary="qualification summary",
+            budget_amount="100",
+            ceiling_price="90",
+            bid_open_or_response_deadline="2026-06-20 09:00:00",
             employee_readable_url="https://hengyang.hnsggzy.com/#/resources/transactionDetail/construction?bidSectionId=s1&t=GC",
             raw_api_url="https://example.com/api",
             lead_tier="WATCHLIST",
             lead_reason="reason",
+            hit_keywords=["design"],
+            fetched_at="2026-06-11 11:00:00",
         )
         fields = client._build_notice_fields(notice)
+        self.assertEqual(
+            set(fields.keys()),
+            {
+                "项目名称",
+                "商机层级",
+                "公告类型",
+                "发布时间",
+                "地区",
+                "招标人或采购单位",
+                "代理机构",
+                "预算金额",
+                "最高限价",
+                "截止时间",
+                "命中关键词",
+                "分类理由",
+                "原文链接",
+                "抓取时间",
+                "唯一键",
+            },
+        )
         self.assertEqual(fields["原文链接"], notice.employee_readable_url)
-        self.assertEqual(fields["官方平台入口"], OFFICIAL_PLATFORM_URL)
-        self.assertEqual(fields["建议搜索关键词"], "Project One")
-        self.assertEqual(fields["原始接口链接"], "https://example.com/api")
+        self.assertEqual(fields["截止时间"], "2026-06-20 09:00:00")
+        self.assertEqual(fields["命中关键词"], "design")
+        self.assertEqual(fields["唯一键"], "d1")
 
     def test_notice_fields_keep_safe_fallback_without_direct_url(self) -> None:
         client = FeishuClient(mock.Mock())
@@ -379,10 +395,9 @@ class FeishuSchemaTests(unittest.TestCase):
         )
         fields = client._build_notice_fields(notice)
         self.assertEqual(fields["原文链接"], OFFICIAL_PLATFORM_URL)
-        self.assertEqual(fields["建议搜索关键词"], "Project One")
-        self.assertEqual(fields["原始接口链接"], "https://example.com/api")
+        self.assertEqual(fields["项目名称"], "Project One")
 
-    def test_summary_uses_direct_detail_url_when_available(self) -> None:
+    def test_summary_uses_detailed_format_with_raw_url(self) -> None:
         client = FeishuClient(mock.Mock())
         notice = Notice(
             source="source",
@@ -392,17 +407,35 @@ class FeishuSchemaTests(unittest.TestCase):
             project_name="Project One",
             notice_type="Tender Notice",
             purchaser_or_tenderer="Purchaser",
+            agency="Agency",
             region="Hengyang",
+            budget_amount="100",
+            ceiling_price="90",
+            procurement_method="公开招标",
+            file_get_deadline="2026-06-18 09:00:00",
+            bid_open_or_response_deadline="2026-06-20 09:00:00",
             content_summary="content summary",
             qualification_summary="qualification summary",
+            accepts_consortium="未提取到",
+            has_attachment=True,
+            attachment_count=2,
             employee_readable_url="https://hengyang.hnsggzy.com/#/resources/transactionDetail/construction?bidSectionId=s1&t=GC",
             raw_api_url="https://example.com/api",
             lead_tier="WATCHLIST",
             lead_reason="reason",
+            matched_positive_signals=["design"],
+            matched_negative_signals=["construction"],
         )
         lines = client._build_notice_message_lines(notice)
-        self.assertTrue(any(line.startswith("原文详情页：") for line in lines))
-        self.assertTrue(any("https://example.com/api" in line for line in lines))
+        self.assertEqual(lines[0], "商机层级：WATCHLIST")
+        self.assertTrue(any(line == "项目名称：Project One" for line in lines))
+        self.assertTrue(any(line == "招标人或采购单位：Purchaser" for line in lines))
+        self.assertTrue(any(line == "文件获取截止时间：2026-06-18 09:00:00" for line in lines))
+        self.assertTrue(any(line == "开标或响应截止时间：2026-06-20 09:00:00" for line in lines))
+        self.assertTrue(any(line == "附件数量：2" for line in lines))
+        self.assertTrue(any(line.startswith("人工建议：") for line in lines))
+        self.assertTrue(any(line.startswith("原文详情页：https://hengyang.hnsggzy.com/") for line in lines))
+        self.assertTrue(any(line == "原始接口链接（仅供复核）：https://example.com/api" for line in lines))
 
     def test_summary_keeps_fallback_when_direct_url_missing(self) -> None:
         client = FeishuClient(mock.Mock())
@@ -416,9 +449,67 @@ class FeishuSchemaTests(unittest.TestCase):
             lead_tier="WATCHLIST",
         )
         lines = client._build_notice_message_lines(notice)
-        self.assertTrue(any("官方平台入口" in line and OFFICIAL_PLATFORM_URL in line for line in lines))
+        self.assertTrue(any(line == f"官方平台入口：{OFFICIAL_PLATFORM_URL}" for line in lines))
         self.assertTrue(any(line == "建议搜索关键词：Project One" for line in lines))
         self.assertTrue(any("原始接口链接（仅供复核）" in line for line in lines))
+
+    def test_send_summary_uses_detailed_header(self) -> None:
+        client = FeishuClient(mock.Mock())
+        notices = [
+            Notice(source="s", source_subtype="t", dedupe_key="1", section_id="a", project_name="One", lead_tier="DIRECT"),
+            Notice(source="s", source_subtype="t", dedupe_key="2", section_id="b", project_name="Two", lead_tier="WATCHLIST"),
+        ]
+        with mock.patch.object(client, "send_bot_message", return_value=True) as send_bot_message:
+            client.send_summary(notices)
+
+        message = send_bot_message.call_args.args[0]
+        self.assertTrue(message.startswith("【TenderRadarLite】"))
+        self.assertIn("商机层级：DIRECT", message)
+
+    def test_init_schema_is_idempotent_when_fields_exist(self) -> None:
+        client = FeishuClient(mock.Mock())
+        fields = [{"field_id": "fld1", "field_name": PRIMARY_FIELD_NAME, "is_primary": True}] + [
+            {"field_id": f"fld{index}", "field_name": field_name, "is_primary": False}
+            for index, field_name in enumerate(SCHEMA_FIELDS, start=2)
+        ]
+
+        with (
+            mock.patch.object(client, "parse_bitable_target_from_env", return_value=("app_token", "tbl1")),
+            mock.patch.object(client, "_get_tenant_access_token", return_value="token"),
+            mock.patch.object(
+                client,
+                "_resolve_target_table",
+                return_value=mock.Mock(app_token="app_token", table_id="tbl1", table_name="数据表"),
+            ),
+            mock.patch.object(client, "_list_fields", return_value=fields),
+            mock.patch.object(client, "_create_field") as create_field,
+        ):
+            result = client.init_schema()
+
+        create_field.assert_not_called()
+        self.assertEqual(result["created_fields"], [])
+        self.assertEqual(result["failed_fields"], [])
+
+    def test_init_schema_stops_when_primary_rename_fails(self) -> None:
+        client = FeishuClient(mock.Mock())
+        fields = [{"field_id": "fld1", "field_name": "文本", "is_primary": True}]
+
+        with (
+            mock.patch.object(client, "parse_bitable_target_from_env", return_value=("app_token", "tbl1")),
+            mock.patch.object(client, "_get_tenant_access_token", return_value="token"),
+            mock.patch.object(
+                client,
+                "_resolve_target_table",
+                return_value=mock.Mock(app_token="app_token", table_id="tbl1", table_name="数据表"),
+            ),
+            mock.patch.object(client, "_list_fields", return_value=fields),
+            mock.patch.object(client, "_update_field", side_effect=RuntimeError("rename failed")),
+            mock.patch.object(client, "_create_field") as create_field,
+        ):
+            with self.assertRaises(RuntimeError):
+                client.init_schema()
+
+        create_field.assert_not_called()
 
 
 class MainEntryTests(unittest.TestCase):
@@ -434,6 +525,27 @@ class MainEntryTests(unittest.TestCase):
         kwargs = run_once.call_args.kwargs
         self.assertFalse(kwargs["enable_feishu"])
         self.assertTrue(kwargs["structured_preview"])
+
+    def test_init_feishu_fields_alias_calls_init_schema(self) -> None:
+        from app.main import main
+
+        fake_client = mock.Mock()
+        fake_client.init_schema.return_value = {
+            "app_token_masked": "mask",
+            "table_id": "tbl",
+            "table_name": "数据表",
+            "existing_fields": ["项目名称"],
+            "created_fields": [],
+            "renamed_fields": [],
+            "failed_fields": [],
+            "existing_field_count": 1,
+        }
+
+        with mock.patch("app.main.FeishuClient", return_value=fake_client):
+            exit_code = main(["--init-feishu-fields"])
+
+        self.assertEqual(exit_code, 0)
+        fake_client.init_schema.assert_called_once()
 
 
 if __name__ == "__main__":

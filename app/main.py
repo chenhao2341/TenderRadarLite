@@ -7,6 +7,7 @@ from .feishu import FeishuClient, FeishuConfigError
 from .logging_utils import setup_logging
 from .runner import (
     backfill_feishu,
+    reset_pilot_sync_state,
     run_once,
     run_pilot_notice_whitelist,
     structured_preview_report_path,
@@ -16,11 +17,13 @@ from .runner import (
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="TenderRadarLite local tender monitoring")
     parser.add_argument("--init-feishu-schema", action="store_true", help="Initialize Feishu schema")
+    parser.add_argument("--init-feishu-fields", action="store_true", help="Initialize or backfill required Feishu fields")
     parser.add_argument("--test-feishu-write", action="store_true", help="Write one Feishu test record")
     parser.add_argument("--test-webhook", action="store_true", help="Send one Feishu webhook test message")
     parser.add_argument("--list-feishu-chats", action="store_true", help="List visible Feishu chats for app bot mode")
     parser.add_argument("--test-feishu-bot", action="store_true", help="Send one Feishu bot test message with current bot mode")
     parser.add_argument("--backfill-feishu", action="store_true", help="Backfill matching SQLite history to Feishu")
+    parser.add_argument("--reset-pilot-sync-state", action="store_true", help="Reset pilot Feishu sync state for whitelist notices")
     parser.add_argument("--local-only", action="store_true", help="Fetch and dedupe locally without Feishu")
     parser.add_argument(
         "--local-structured-preview",
@@ -114,11 +117,13 @@ def main(argv: list[str] | None = None) -> int:
 
     selected = [
         args.init_feishu_schema,
+        args.init_feishu_fields,
         args.test_feishu_write,
         args.test_webhook,
         args.list_feishu_chats,
         args.test_feishu_bot,
         args.backfill_feishu,
+        args.reset_pilot_sync_state,
         args.local_only,
         args.local_structured_preview,
     ]
@@ -128,16 +133,22 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--dry-run and --execute cannot be combined")
     if (args.dry_run or args.execute) and not args.pilot_notice_ids_file:
         parser.error("--dry-run/--execute require --pilot-notice-ids-file")
-    if args.pilot_notice_ids_file and any(selected):
+    if args.backfill_feishu and (args.dry_run or args.execute):
+        parser.error("--backfill-feishu cannot be combined with --dry-run/--execute")
+    if args.reset_pilot_sync_state and (args.dry_run or args.execute):
+        parser.error("--reset-pilot-sync-state cannot be combined with --dry-run/--execute")
+    selected_without_pilot_file = [
+        args.init_feishu_schema,
+        args.init_feishu_fields,
+        args.test_feishu_write,
+        args.test_webhook,
+        args.list_feishu_chats,
+        args.test_feishu_bot,
+        args.local_only,
+        args.local_structured_preview,
+    ]
+    if args.pilot_notice_ids_file and any(selected_without_pilot_file):
         parser.error("--pilot-notice-ids-file cannot be combined with other entrypoints")
-
-    if args.pilot_notice_ids_file:
-        result = run_pilot_notice_whitelist(
-            args.pilot_notice_ids_file,
-            execute=args.execute,
-        )
-        _print_pilot_notice_whitelist_result(result)
-        return 0
 
     if args.local_only:
         results = run_once(enable_feishu=False)
@@ -150,9 +161,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"preview_report: {structured_preview_report_path()}")
         return _return_code_for_run(results, logger)
 
-    if args.init_feishu_schema:
+    if args.init_feishu_schema or args.init_feishu_fields:
         client = FeishuClient(logger)
-        _print_env_status(client)
         try:
             result = client.init_schema()
         except FeishuConfigError as exc:
@@ -161,11 +171,9 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             print(f"Feishu schema init failed: {exc}")
             return 1
-        print(f"target app_token: {result['app_token_masked']}")
-        print(f"target table_id: {result['table_id']}")
         print(f"target table_name: {result['table_name']}")
-        print(f"existing fields: {', '.join(result['existing_fields']) if result['existing_fields'] else 'none'}")
-        print(f"created fields: {', '.join(result['created_fields']) if result['created_fields'] else 'none'}")
+        print(f"existing field count: {result.get('existing_field_count', len(result['existing_fields']))}")
+        print(f"created field count: {len(result['created_fields'])}")
         print(f"renamed fields: {', '.join(result['renamed_fields']) if result['renamed_fields'] else 'none'}")
         print(f"failed fields: {', '.join(result['failed_fields']) if result['failed_fields'] else 'none'}")
         return 0
@@ -228,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.backfill_feishu:
         try:
-            result = backfill_feishu()
+            result = backfill_feishu(args.pilot_notice_ids_file)
         except FeishuConfigError as exc:
             print(str(exc))
             return 2
@@ -238,12 +246,29 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"SQLite history total: {result.total_history_count}")
         print(f"Hit keyword history: {result.hit_history_count}")
-        if result.hit_history_count == 0:
+        if not args.pilot_notice_ids_file and result.hit_history_count == 0:
             print("Local history exists but hit keyword count is 0")
             return 0
         print(f"Eligible for backfill: {result.eligible_count}")
         print(f"Feishu records written this run: {result.written_count}")
         print(f"Group bot summary sent: {'yes' if result.notified else 'no'}")
+        print(f"Bot notices sent this run: {result.bot_sent_count}")
+        return 0
+
+    if args.reset_pilot_sync_state:
+        if not args.pilot_notice_ids_file:
+            parser.error("--reset-pilot-sync-state requires --pilot-notice-ids-file")
+        result = reset_pilot_sync_state(args.pilot_notice_ids_file)
+        print(f"Pilot notice ids targeted: {result.targeted_count}")
+        print(f"Pilot sync rows reset: {result.reset_count}")
+        return 0
+
+    if args.pilot_notice_ids_file:
+        result = run_pilot_notice_whitelist(
+            args.pilot_notice_ids_file,
+            execute=args.execute,
+        )
+        _print_pilot_notice_whitelist_result(result)
         return 0
 
     results = run_once(enable_feishu=True)
