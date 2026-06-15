@@ -4,6 +4,8 @@ import unittest
 from unittest import mock
 
 from app.adapters.base import BaseAdapter
+from app.adapters.hengyang_construction import HengyangConstructionAdapter
+from app.adapters.hengyang_procurement import HengyangProcurementAdapter
 from app.adapters.registry import build_adapter, resolve_adapter_class
 from app.models import Notice, RawNotice, RawNoticeDetail
 
@@ -126,6 +128,23 @@ class AdapterFrameworkTests(unittest.TestCase):
 
         adapter = _build_adapter(source, mock.create_autospec(Fetcher, instance=True))
         self.assertEqual(type(adapter).__name__, "HengyangConstructionAdapter")
+
+    def test_real_adapters_expose_structured_pipeline_methods(self) -> None:
+        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter):
+            self.assertIsNot(adapter_class.fetch_list, BaseAdapter.fetch_list)
+            self.assertIsNot(adapter_class.fetch_detail, BaseAdapter.fetch_detail)
+            self.assertIsNot(adapter_class.normalize, BaseAdapter.normalize)
+
+    def test_real_adapters_support_structured_pipeline_detection(self) -> None:
+        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter):
+            adapter = adapter_class(
+                source_name="demo",
+                url="https://example.com/list",
+                region="Hengyang",
+                fetcher=mock.Mock(),
+                source_config={"name": "demo", "source_type": "demo"},
+            )
+            self.assertTrue(adapter._uses_structured_pipeline())
 
 
 if __name__ == "__main__":

@@ -14,115 +14,151 @@ from .hengyang_trade_utils import (
 
 
 class HengyangConstructionAdapter(BaseAdapter):
-    def crawl(self) -> list[Notice]:
-        notices: list[Notice] = []
-        fetched_sections = 0
-        detail_success = 0
-        skipped = 0
+    def fetch_list(self) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
         error_count = 0
         successful_pages = 0
-        latest_site_publish_time = ""
-        origin = base_origin(self.url)
         pages_scanned = max(int(self.source_config.get("pages_scanned", 1) or 1), 1)
         page_size = max(int(self.source_config.get("page_size", 10) or 10), 1)
 
         for page in range(1, pages_scanned + 1):
             page_url = build_paged_url(self.url, current=page, size=page_size)
             payload = self.fetcher.get_json(page_url) or {}
-            data = payload.get("data") or {}
-            records = data.get("records") or []
             if not payload:
                 error_count += 1
                 continue
 
+            page_records = ((payload.get("data") or {}).get("records")) or []
             successful_pages += 1
-            fetched_sections += len(records)
+            records.extend(page_records)
 
-            for record in records:
-                section_id = (record.get("bidSectionId") or "").strip()
-                if not section_id:
-                    skipped += 1
-                    continue
-
-                project_payload = self.fetcher.get_json(
-                    f"{origin}/tradeApi/constructionTender/getBySectionId?sectionId={section_id}"
-                ) or {}
-                notice_payload = self.fetcher.get_json(
-                    f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
-                ) or {}
-                attachment_payload = self.fetcher.get_json(
-                    f"{origin}/tradeApi/attach/proxy/getFileListBySectionId?sectionId={section_id}"
-                ) or {}
-
-                detail = project_payload.get("data") or {}
-                notice_list = (notice_payload.get("data") or {}).get("noticeList") or []
-                if not detail or not notice_list:
-                    skipped += 1
-                    continue
-
-                tender = detail.get("constructionTender") or {}
-                project = detail.get("constructionProject") or {}
-                section_list = detail.get("constructionSectionList") or []
-                section = section_list[0] if section_list else {}
-                attachments = attachment_payload.get("data") or []
-                raw_api_url = f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
-                employee_url = build_transaction_detail_url(
-                    origin=origin,
-                    tender_project_type=(record.get("tenderProjectType") or "CONSTRUCTION"),
-                    section_id=section_id,
-                )
-
-                for notice_info in notice_list:
-                    notice_html = notice_info.get("noticeContent") or ""
-                    content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
-                    notice = Notice(
-                        source=self.source_config.get("source", "衡阳分平台"),
-                        source_subtype=self.source_config.get("source_subtype", "建设工程交易"),
-                        dedupe_key="",
-                        section_id=section_id,
-                        notice_id=(notice_info.get("id") or notice_info.get("noticeId") or "").strip(),
-                        notice_title=(notice_info.get("noticeName") or "").strip(),
-                        notice_publish_time=(notice_info.get("noticeSendTime") or record.get("noticeSendTime") or "").strip(),
-                        project_name=(tender.get("tenderProjectName") or record.get("tenderProjectName") or "").strip(),
-                        section_name=(section.get("bidSectionName") or record.get("bidSectionName") or "").strip(),
-                        notice_type=(notice_info.get("bulletinType") or record.get("noticeType") or "招标公告").strip(),
-                        project_code=(tender.get("tenderProjectCode") or project.get("projectCode") or "").strip(),
-                        purchaser_or_tenderer=(tender.get("ownerName") or tender.get("tendererName") or "").strip(),
-                        agency=(tender.get("tenderAgencyName") or "").strip(),
-                        region=_normalize_region(project.get("regionCode") or record.get("name") or self.region),
-                        publish_time=(notice_info.get("noticeSendTime") or record.get("noticeSendTime") or "").strip(),
-                        file_get_deadline=(notice_info.get("docGetEndTime") or "").strip(),
-                        bid_open_or_response_deadline=(
-                            notice_info.get("bidOpenTime") or notice_info.get("bidOpeningTimeStart") or deadline
-                        ).strip(),
-                        budget_amount=_stringify_number(section.get("contractReckonPrice")),
-                        ceiling_price=_stringify_number(section.get("tenderControlPrice")),
-                        procurement_method=(tender.get("tenderMode") or section.get("tenderType") or "").strip(),
-                        content_summary=content_summary,
-                        qualification_summary=qualification_summary,
-                        accepts_consortium=consortium,
-                        original_url=employee_url,
-                        employee_readable_url=employee_url,
-                        raw_api_url=raw_api_url,
-                        has_attachment=bool(attachments),
-                        attachment_count=len(attachments),
-                        fetched_at=self.now_string(),
-                    )
-                    notice.dedupe_key = build_dedupe_key(notice)
-                    notices.append(notice)
-                    detail_success += 1
-                    latest_site_publish_time = max(latest_site_publish_time, notice.publish_time or "")
-
-        self.last_crawl_stats = {
+        self._list_stats = {
             "pages_scanned": pages_scanned,
             "page_size": page_size,
-            "list_count": fetched_sections,
-            "fetched_total": fetched_sections,
+            "fetched_total": len(records),
+            "error_count": error_count,
+            "successful_pages": successful_pages,
+        }
+        return records
+
+    def fetch_detail(self, item: dict[str, Any]) -> dict[str, Any] | None:
+        section_id = (item.get("bidSectionId") or "").strip()
+        if not section_id:
+            return None
+
+        origin = base_origin(self.url)
+        project_payload = self.fetcher.get_json(
+            f"{origin}/tradeApi/constructionTender/getBySectionId?sectionId={section_id}"
+        ) or {}
+        notice_payload = self.fetcher.get_json(
+            f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
+        ) or {}
+        attachment_payload = self.fetcher.get_json(
+            f"{origin}/tradeApi/attach/proxy/getFileListBySectionId?sectionId={section_id}"
+        ) or {}
+
+        detail = project_payload.get("data") or {}
+        notice_list = (notice_payload.get("data") or {}).get("noticeList") or []
+        if not detail or not notice_list:
+            return None
+
+        return {
+            "detail": detail,
+            "notice_list": notice_list,
+            "attachments": attachment_payload.get("data") or [],
+            "raw_api_url": f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}",
+            "employee_url": build_transaction_detail_url(
+                origin=origin,
+                tender_project_type=(item.get("tenderProjectType") or "CONSTRUCTION"),
+                section_id=section_id,
+            ),
+        }
+
+    def normalize(self, item: dict[str, Any], detail: dict[str, Any] | None = None) -> Notice:
+        if not detail:
+            raise ValueError("construction detail is required")
+
+        section_id = (item.get("bidSectionId") or "").strip()
+        payload = detail.get("detail") or {}
+        tender = payload.get("constructionTender") or {}
+        project = payload.get("constructionProject") or {}
+        section_list = payload.get("constructionSectionList") or []
+        section = section_list[0] if section_list else {}
+        attachments = detail.get("attachments") or []
+        notice_info = (detail.get("notice") or ((detail.get("notice_list") or [{}])[0])) or {}
+        content_summary, qualification_summary, deadline, consortium = summarize_notice_html(
+            notice_info.get("noticeContent") or ""
+        )
+
+        notice = Notice(
+            source=self.source_config.get("source", "衡阳分平台"),
+            source_subtype=self.source_config.get("source_subtype", "建设工程交易"),
+            dedupe_key="",
+            section_id=section_id,
+            notice_id=(notice_info.get("id") or notice_info.get("noticeId") or "").strip(),
+            notice_title=(notice_info.get("noticeName") or "").strip(),
+            notice_publish_time=(notice_info.get("noticeSendTime") or item.get("noticeSendTime") or "").strip(),
+            project_name=(tender.get("tenderProjectName") or item.get("tenderProjectName") or "").strip(),
+            section_name=(section.get("bidSectionName") or item.get("bidSectionName") or "").strip(),
+            notice_type=(notice_info.get("bulletinType") or item.get("noticeType") or "招标公告").strip(),
+            project_code=(tender.get("tenderProjectCode") or project.get("projectCode") or "").strip(),
+            purchaser_or_tenderer=(tender.get("ownerName") or tender.get("tendererName") or "").strip(),
+            agency=(tender.get("tenderAgencyName") or "").strip(),
+            region=_normalize_region(project.get("regionCode") or item.get("name") or self.region),
+            publish_time=(notice_info.get("noticeSendTime") or item.get("noticeSendTime") or "").strip(),
+            file_get_deadline=(notice_info.get("docGetEndTime") or "").strip(),
+            bid_open_or_response_deadline=(
+                notice_info.get("bidOpenTime") or notice_info.get("bidOpeningTimeStart") or deadline
+            ).strip(),
+            budget_amount=_stringify_number(section.get("contractReckonPrice")),
+            ceiling_price=_stringify_number(section.get("tenderControlPrice")),
+            procurement_method=(tender.get("tenderMode") or section.get("tenderType") or "").strip(),
+            content_summary=content_summary,
+            qualification_summary=qualification_summary,
+            accepts_consortium=consortium,
+            original_url=str(detail.get("employee_url") or ""),
+            employee_readable_url=str(detail.get("employee_url") or ""),
+            raw_api_url=str(detail.get("raw_api_url") or ""),
+            has_attachment=bool(attachments),
+            attachment_count=len(attachments),
+            fetched_at=self.now_string(),
+        )
+        notice.dedupe_key = build_dedupe_key(notice)
+        return notice
+
+    def crawl(self) -> list[Notice]:
+        notices: list[Notice] = []
+        detail_success = 0
+        skipped = 0
+        latest_site_publish_time = ""
+
+        for item in self.fetch_list():
+            if not (item.get("bidSectionId") or "").strip():
+                skipped += 1
+                continue
+
+            detail = self.fetch_detail(item)
+            if not detail:
+                skipped += 1
+                continue
+
+            for notice_info in detail.get("notice_list") or []:
+                notice = self.normalize(item, {**detail, "notice": notice_info})
+                notices.append(notice)
+                detail_success += 1
+                latest_site_publish_time = max(latest_site_publish_time, notice.publish_time or "")
+
+        list_stats = getattr(self, "_list_stats", {})
+        self.last_crawl_stats = {
+            "pages_scanned": list_stats.get("pages_scanned", 1),
+            "page_size": list_stats.get("page_size", 10),
+            "list_count": list_stats.get("fetched_total", 0),
+            "fetched_total": list_stats.get("fetched_total", 0),
             "detail_success_count": detail_success,
             "skipped_count": skipped,
             "real_notice_count": detail_success,
-            "error_count": error_count,
-            "fetch_failed": 1 if successful_pages == 0 else 0,
+            "error_count": list_stats.get("error_count", 0),
+            "fetch_failed": 1 if list_stats.get("successful_pages", 0) == 0 else 0,
             "latest_site_publish_time": latest_site_publish_time,
         }
         return notices
@@ -139,4 +175,4 @@ def _stringify_number(value: Any) -> str:
 
 def _normalize_region(value: str) -> str:
     region = (value or "").strip()
-    return region.replace("·", "-")
+    return region.replace("路", "-")

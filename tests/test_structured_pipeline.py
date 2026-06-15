@@ -92,6 +92,109 @@ class StructuredStorageTests(unittest.TestCase):
 
 
 class AdapterBehaviorTests(unittest.TestCase):
+    def test_procurement_adapter_fetch_normalize_pipeline_preserves_key_fields(self) -> None:
+        from app.adapters.hengyang_procurement import HengyangProcurementAdapter
+
+        list_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/"
+            "projectInformation/selectAll?regionCode=430400&current=1&size=10"
+        )
+        section_id = "sec-1"
+        project_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/"
+            f"getBySectionId?sectionId={section_id}"
+        )
+        ann_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/"
+            f"getAnnouncementBySectionId?sectionId={section_id}"
+        )
+        fetcher = FakeFetcher(
+            {
+                list_url: {
+                    "data": {
+                        "records": [
+                            {
+                                "bidSectionId": section_id,
+                                "projectId": "proj-1",
+                                "purchaseProjectName": "Project One",
+                                "purchaseSectionName": "Package One",
+                                "regionName": "Hengyang",
+                                "noticeType": "Tender Notice",
+                                "noticeSendTime": "2026-06-11 10:00:00",
+                            }
+                        ]
+                    }
+                },
+                project_url: {
+                    "data": {
+                        "governmentProcurementProjectInformation": {
+                            "purchaseProjectName": "Project One",
+                            "purchaseProjectCode": "PC-1",
+                            "purchaserName": "Purchaser One",
+                            "purchaserAgencyName": "Agency One",
+                            "programBudget": "100",
+                            "regionCode": "430400",
+                        },
+                        "GovernmentProcureSectionInformationList": [
+                            {
+                                "id": section_id,
+                                "purchaseSectionName": "Package One",
+                                "tenderType": "Competitive Negotiation",
+                                "sectionBudget": "100",
+                                "controlPrice": "90",
+                            }
+                        ],
+                        "GovernmentPurchaseFile": [{"name": "file1.pdf"}],
+                    }
+                },
+                ann_url: {
+                    "code": 200,
+                    "data": {
+                        "governmentProcureAnnouncementInformation": [
+                            {
+                                "id": "ann-1",
+                                "noticeName": "Project One competitive negotiation notice",
+                                "bulletinType": "Tender Notice",
+                                "noticeSendTime": "2026-06-11T10:00:00.000+08:00",
+                                "noticeContent": (
+                                    "<p>Procurement project: Project One</p>"
+                                    "<p>Qualification: supplier qualification required</p>"
+                                    "<p>Deadline: 2026-06-20 09:00:00</p>"
+                                    "<p>Consortium supported: No</p>"
+                                ),
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        adapter = HengyangProcurementAdapter(
+            source_name="procurement",
+            url=list_url,
+            region="Hengyang",
+            fetcher=fetcher,
+            source_config={"source": "source", "source_subtype": "procurement"},
+        )
+
+        items = adapter.fetch_list()
+        self.assertEqual(len(items), 1)
+
+        detail = adapter.fetch_detail(items[0])
+        notice = adapter.normalize(items[0], detail)
+
+        self.assertIsInstance(notice, Notice)
+        self.assertEqual(notice.source, "source")
+        self.assertEqual(notice.source_subtype, "procurement")
+        self.assertEqual(notice.project_name, "Project One")
+        self.assertEqual(notice.section_name, "Package One")
+        self.assertTrue(hasattr(notice, "qualification_summary"))
+        self.assertIsInstance(notice.qualification_summary, str)
+        self.assertTrue(notice.content_summary)
+        self.assertEqual(notice.original_url, ann_url)
+        self.assertEqual(notice.raw_api_url, ann_url)
+        self.assertTrue(notice.dedupe_key)
+
     def test_procurement_adapter_skips_sections_without_real_notice(self) -> None:
         from app.adapters.hengyang_procurement import HengyangProcurementAdapter
 
@@ -286,6 +389,108 @@ class AdapterBehaviorTests(unittest.TestCase):
             notices[0].raw_api_url,
             "https://hengyang.hnsggzy.com/tradeApi/constructionNotice/getBySectionId?sectionId=sec-1",
         )
+
+    def test_construction_adapter_fetch_normalize_pipeline_preserves_key_fields(self) -> None:
+        from app.adapters.hengyang_construction import HengyangConstructionAdapter
+
+        list_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/constructionTender/"
+            "listByFile?regionCode=430400&current=1&size=10"
+        )
+        section_id = "sec-1"
+        project_url = f"https://hengyang.hnsggzy.com/tradeApi/constructionTender/getBySectionId?sectionId={section_id}"
+        notice_url = f"https://hengyang.hnsggzy.com/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
+        attachment_url = f"https://hengyang.hnsggzy.com/tradeApi/attach/proxy/getFileListBySectionId?sectionId={section_id}"
+        fetcher = FakeFetcher(
+            {
+                list_url: {
+                    "data": {
+                        "records": [
+                            {
+                                "bidSectionId": section_id,
+                                "regionCode": "430400",
+                                "tenderProjectType": "CONSTRUCTION",
+                                "noticeType": "Tender Notice",
+                                "name": "Hengyang",
+                                "tenderProjectName": "Example Construction",
+                                "bidSectionName": "Section A",
+                                "noticeSendTime": "2026-06-11 10:00:00",
+                            }
+                        ]
+                    }
+                },
+                project_url: {
+                    "data": {
+                        "constructionTender": {
+                            "id": "tender-1",
+                            "tenderProjectName": "Example Construction",
+                            "tenderProjectCode": "P-1",
+                            "ownerName": "Tenderer A",
+                            "tenderAgencyName": "Agency A",
+                            "tenderMode": "Open Tender",
+                        },
+                        "constructionProject": {"regionCode": "Hunan-Hengyang-Hengnan"},
+                        "constructionSectionList": [
+                            {
+                                "bidSectionName": "Section A",
+                                "contractReckonPrice": 100,
+                                "tenderControlPrice": 90,
+                            }
+                        ],
+                    }
+                },
+                notice_url: {
+                    "data": {
+                        "noticeList": [
+                            {
+                                "id": "notice-1",
+                                "noticeName": "Example Construction notice",
+                                "bulletinType": "Tender Notice",
+                                "noticeSendTime": "2026-06-11 10:00:00",
+                                "noticeContent": (
+                                    "<p>Project overview: example construction</p>"
+                                    "<p>Qualification: required</p>"
+                                    "<p>Deadline: 2026-06-30 09:00:00</p>"
+                                ),
+                                "docGetEndTime": "2026-06-20 17:00:00",
+                                "bidOpeningTimeStart": "2026-06-30 09:00:00",
+                            }
+                        ]
+                    }
+                },
+                attachment_url: {"data": [{"name": "drawing.pdf"}]},
+            }
+        )
+
+        adapter = HengyangConstructionAdapter(
+            source_name="construction",
+            url=list_url,
+            region="Hengyang",
+            fetcher=fetcher,
+            source_config={"source": "source", "source_subtype": "construction"},
+        )
+
+        items = adapter.fetch_list()
+        self.assertEqual(len(items), 1)
+
+        detail = adapter.fetch_detail(items[0])
+        notice = adapter.normalize(items[0], detail)
+
+        self.assertIsInstance(notice, Notice)
+        self.assertEqual(notice.source, "source")
+        self.assertEqual(notice.source_subtype, "construction")
+        self.assertEqual(notice.project_name, "Example Construction")
+        self.assertEqual(notice.section_name, "Section A")
+        self.assertTrue(hasattr(notice, "qualification_summary"))
+        self.assertIsInstance(notice.qualification_summary, str)
+        self.assertTrue(notice.content_summary)
+        self.assertEqual(
+            notice.employee_readable_url,
+            "https://hengyang.hnsggzy.com/#/resources/transactionDetail/construction?bidSectionId=sec-1&t=GC",
+        )
+        self.assertEqual(notice.original_url, notice.employee_readable_url)
+        self.assertEqual(notice.raw_api_url, notice_url)
+        self.assertTrue(notice.dedupe_key)
 
 
 class KeywordCoverageTests(unittest.TestCase):
