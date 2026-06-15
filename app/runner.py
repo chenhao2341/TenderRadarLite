@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .adapters.registry import build_adapter as build_registered_adapter
 from .config import DATA_DIR, REPORT_DIR, ensure_runtime_dirs, load_keywords, load_pilot_notice_ids, load_sources
 from .dedupe import build_dedupe_key
 from .feishu import FeishuClient
@@ -101,15 +101,7 @@ class PilotNoticeWhitelistSummary:
 
 
 def _build_adapter(source: dict, fetcher: Fetcher):
-    module = importlib.import_module(source["module"])
-    adapter_class = getattr(module, source["class"])
-    return adapter_class(
-        source_name=source["name"],
-        url=source["url"],
-        region=source["region"],
-        fetcher=fetcher,
-        source_config=source,
-    )
+    return build_registered_adapter(source, fetcher)
 
 
 def _feishu_has_any_output(client: Any) -> bool:

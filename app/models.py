@@ -1,6 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class RawNotice:
+    source_id: str
+    source_name: str
+    source_type: str
+    raw_id: str = ""
+    title: str = ""
+    url: str = ""
+    publish_time: str = ""
+    raw_payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RawNoticeDetail:
+    source_id: str
+    raw_id: str = ""
+    detail_url: str = ""
+    content_text: str = ""
+    raw_payload: dict[str, Any] = field(default_factory=dict)
+    attachments: list[dict[str, Any]] = field(default_factory=list)
+    extracted_fields: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
