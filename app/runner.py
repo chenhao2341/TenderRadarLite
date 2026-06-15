@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from .adapters.registry import build_adapter as build_registered_adapter
+from .ai_analysis import AIAnalysisConfig, AIAnalysisResult, analyze_notices
 from .config import DATA_DIR, REPORT_DIR, ensure_runtime_dirs, load_keywords, load_pilot_notice_ids, load_sources
 from .dedupe import build_dedupe_key
 from .feishu import FeishuClient
 from .fetcher import Fetcher
-from .html_report import open_html_report, write_html_report
+from .html_report import aggregate_notices, open_html_report, write_html_report
 from .keywords import build_keyword_text, match_keywords
 from .logging_utils import setup_logging
 from .models import Notice
@@ -135,6 +136,8 @@ def run_once(
     structured_preview: bool = False,
     html_report: bool = False,
     profile_id: str = DEFAULT_PROFILE_ID,
+    enable_ai_analysis: bool = False,
+    ai_analysis_limit: int | None = None,
 ) -> list[RunSummary]:
     ensure_runtime_dirs()
     logger = setup_logging()
@@ -308,12 +311,33 @@ def run_once(
     if structured_preview:
         write_structured_preview_report(structured_preview_report_path(), preview_notices, keywords)
     if html_report:
+        ai_results_by_project: dict[str, AIAnalysisResult] = {}
+        ai_status_message = ""
+        if enable_ai_analysis:
+            ai_config = AIAnalysisConfig.from_env(enabled=True, max_items=ai_analysis_limit)
+            candidate_projects = [
+                item for item in aggregate_notices(html_notices) if item.project_tier in {"DIRECT", "WATCHLIST"}
+            ]
+            ai_results = analyze_notices(
+                [item.representative for item in candidate_projects],
+                ai_config,
+                profile_name=str(profile.get("name", profile_id)),
+            )
+            for item, result in zip(candidate_projects, ai_results):
+                ai_results_by_project[item.aggregation_key] = result
+            skip_reasons = [result.skip_reason for result in ai_results if result.skipped and result.skip_reason]
+            if skip_reasons:
+                ai_status_message = f"AI 分析已跳过：{skip_reasons[0]}"
         report_path = write_html_report(
             html_report_path(),
             html_notices,
             source_count=len(enabled_sources),
             profile_name=str(profile.get("name", profile_id)),
+            ai_results=ai_results_by_project,
+            ai_status_message=ai_status_message,
         )
+        if ai_status_message:
+            print(ai_status_message)
         if not open_html_report(report_path):
             logger.warning("failed to auto-open local HTML report: %s", report_path)
 

@@ -38,6 +38,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch new sources and generate a local HTML report without Feishu",
     )
     parser.add_argument(
+        "--ai-analysis",
+        action="store_true",
+        help="Optionally generate AI-assisted explanations for DIRECT/WATCHLIST items in local HTML mode",
+    )
+    parser.add_argument(
+        "--ai-analysis-limit",
+        type=int,
+        help="Maximum DIRECT/WATCHLIST items to analyze when --ai-analysis is enabled",
+    )
+    parser.add_argument(
         "--profile",
         default=DEFAULT_PROFILE_ID,
         help=f"Industry profile to use for local classification (default: {DEFAULT_PROFILE_ID})",
@@ -185,7 +195,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.local_html:
         try:
-            results = run_once(enable_feishu=False, html_report=True, profile_id=args.profile)
+            run_kwargs = {
+                "enable_feishu": False,
+                "html_report": True,
+                "profile_id": args.profile,
+            }
+            if args.ai_analysis or args.ai_analysis_limit is not None:
+                run_kwargs["enable_ai_analysis"] = args.ai_analysis
+                run_kwargs["ai_analysis_limit"] = args.ai_analysis_limit
+            results = run_once(**run_kwargs)
         except ProfileNotFoundError as exc:
             print(str(exc))
             return 2

@@ -67,6 +67,12 @@ scripts/
 tests/
 ```
 
+## AI Analysis Alpha
+
+- `app/ai_analysis.py` 鎻愪緵榛樿鍏抽棴鐨?AI 杈呭姪鐮旀壒鑳藉姏锛屽彧鍦?`--local-html --ai-analysis` 鏃跺惎鐢ㄣ€?
+- AI 鍙宸茬粨鏋勫寲鐨?`Notice` 瀛楁锛屼笉閲嶆柊鎶撳彇銆佷笉鏀瑰彉 `lead_tier`锛屼笉鍐欏叆 SQLite锛屼笉杩涢涔︺€?
+- 鏃犲瘑閽ユ垨璇锋眰澶辫触鏃讹紝鏈湴 HTML 涓绘祦绋嬩繚鎸佸彲鐢紝浠呭湪鎺у埗鍙版垨 HTML 鎻愮ず AI 宸茶烦杩囥€?
+
 ## 设计边界
 
 - adapter 负责来源差异，不负责全局存储策略。

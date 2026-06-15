@@ -9,6 +9,7 @@ import re
 from typing import Iterable
 import webbrowser
 
+from .ai_analysis import AIAnalysisResult, MISSING_TEXT
 from .models import Notice
 
 
@@ -67,6 +68,8 @@ def write_html_report(
     source_count: int = 0,
     generated_at: str | None = None,
     profile_name: str | None = None,
+    ai_results: dict[str, AIAnalysisResult] | None = None,
+    ai_status_message: str = "",
 ) -> Path:
     notice_list = list(notices)
     output_path = path.resolve()
@@ -76,6 +79,8 @@ def write_html_report(
         source_count=source_count,
         generated_at=generated_at,
         profile_name=profile_name,
+        ai_results=ai_results,
+        ai_status_message=ai_status_message,
     )
     output_path.write_text(html_text, encoding="utf-8")
     return output_path
@@ -87,9 +92,12 @@ def build_html_report(
     source_count: int = 0,
     generated_at: str | None = None,
     profile_name: str | None = None,
+    ai_results: dict[str, AIAnalysisResult] | None = None,
+    ai_status_message: str = "",
 ) -> str:
     timestamp = generated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     projects = aggregate_notices(notices)
+    ai_results = ai_results or {}
     project_counts = Counter(item.project_tier for item in projects)
     stat_cards = [
         ("本轮公告数", str(len(notices)), "本轮抓取并进入本地报告的公告总数"),
@@ -111,9 +119,9 @@ def build_html_report(
     else:
         body_sections = "".join(
             [
-                _render_primary_section("DIRECT", grouped["DIRECT"]),
-                _render_primary_section("WATCHLIST", grouped["WATCHLIST"]),
-                _render_exclude_section(grouped["EXCLUDE"]),
+                _render_primary_section("DIRECT", grouped["DIRECT"], ai_results=ai_results),
+                _render_primary_section("WATCHLIST", grouped["WATCHLIST"], ai_results=ai_results),
+                _render_exclude_section(grouped["EXCLUDE"], ai_results=ai_results),
                 _render_footer_note(),
             ]
         )
@@ -266,6 +274,16 @@ def build_html_report(
       color: var(--muted);
       font-size: 13px;
       line-height: 1.65;
+    }}
+    .status-banner {{
+      margin: 18px 0 0;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(155, 99, 8, 0.18);
+      background: rgba(255, 242, 217, 0.92);
+      color: #7b520b;
+      font-size: 14px;
+      line-height: 1.7;
     }}
     .report-flow {{
       display: grid;
@@ -509,6 +527,46 @@ def build_html_report(
     .qualification-details p {{
       margin-top: 10px;
     }}
+    .ai-panel {{
+      border-radius: 18px;
+      border: 1px solid rgba(36, 87, 245, 0.12);
+      background: rgba(236, 243, 255, 0.74);
+      padding: 16px 18px;
+    }}
+    .ai-panel h5 {{
+      margin: 0 0 12px;
+      font-size: 14px;
+      font-weight: 800;
+    }}
+    .ai-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+      margin-bottom: 12px;
+    }}
+    .ai-meta {{
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.76);
+      border: 1px solid rgba(36, 87, 245, 0.08);
+    }}
+    .ai-meta strong {{
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }}
+    .ai-meta span {{
+      display: block;
+      font-size: 14px;
+      line-height: 1.6;
+    }}
+    .ai-panel p {{
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.75;
+    }}
     .qualification-fulltext {{
       margin-top: 10px;
       color: var(--muted);
@@ -644,6 +702,7 @@ def build_html_report(
         </div>
       </div>
     </section>
+    {_render_status_banner(ai_status_message)}
     <section class="stats">
       {"".join(_render_stat_card(title, value, note) for title, value, note in stat_cards)}
     </section>
@@ -739,9 +798,15 @@ def _render_stat_card(title: str, value: str, note: str) -> str:
     )
 
 
-def _render_primary_section(tier: str, items: list[ProjectReportItem]) -> str:
+def _render_status_banner(message: str) -> str:
+    if not message:
+        return ""
+    return f'<section class="status-banner">{_escape(message)}</section>'
+
+
+def _render_primary_section(tier: str, items: list[ProjectReportItem], *, ai_results: dict[str, AIAnalysisResult]) -> str:
     section_body = (
-        "".join(_render_project_card(item) for item in items)
+        "".join(_render_project_card(item, ai_result=ai_results.get(item.aggregation_key)) for item in items)
         if items
         else f'<article class="project-card"><p class="section-note">{_escape(TIER_EMPTY_HINTS[tier])}</p></article>'
     )
@@ -759,10 +824,10 @@ def _render_primary_section(tier: str, items: list[ProjectReportItem]) -> str:
     """
 
 
-def _render_exclude_section(items: list[ProjectReportItem]) -> str:
+def _render_exclude_section(items: list[ProjectReportItem], *, ai_results: dict[str, AIAnalysisResult]) -> str:
     preview = "；".join(item.project_name for item in items[:5]) if items else TIER_EMPTY_HINTS["EXCLUDE"]
     body = (
-        "".join(_render_project_card(item, compact=True) for item in items)
+        "".join(_render_project_card(item, compact=True, ai_result=ai_results.get(item.aggregation_key)) for item in items)
         if items
         else f'<article class="project-card"><p class="section-note">{_escape(TIER_EMPTY_HINTS["EXCLUDE"])}</p></article>'
     )
@@ -794,7 +859,7 @@ def _render_footer_note() -> str:
     """
 
 
-def _render_project_card(item: ProjectReportItem, *, compact: bool = False) -> str:
+def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_result: AIAnalysisResult | None = None) -> str:
     rep = item.representative
     notice_types = "".join(f'<span class="chip notice-type">{_escape(label)}</span>' for label in item.notice_labels)
     keywords = _render_chip_row(item.keyword_labels, empty_label="无")
@@ -849,6 +914,7 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False) -> s
         </details>
         {_render_qualification_panel(item, compact=compact)}
       </div>
+      {_render_ai_panel(ai_result)}
       <div class="project-actions">
         {_render_link_button(rep)}
         <div class="action-note">原文链接用于人工复核。展示层已按项目聚合，不改变底层公告级去重。</div>
@@ -908,6 +974,30 @@ def _render_qualification_panel(item: ProjectReportItem, *, compact: bool) -> st
       <h5>资质要求摘要</h5>
       <p>{source}<span class="summary-body">{_escape(preview_text)}</span></p>
       {details_block}
+    </section>
+    """
+
+
+def _render_ai_panel(ai_result: AIAnalysisResult | None) -> str:
+    if ai_result is None or ai_result.skipped:
+        return ""
+    score_text = str(ai_result.opportunity_score) if ai_result.opportunity_score is not None else MISSING_TEXT
+    recommendation_text = ai_result.recommendation or MISSING_TEXT
+    reasons_text = "；".join(ai_result.reasons) if ai_result.reasons else MISSING_TEXT
+    risks_text = "；".join(ai_result.risks) if ai_result.risks else MISSING_TEXT
+    follow_up_text = "；".join(ai_result.follow_up_questions) if ai_result.follow_up_questions else MISSING_TEXT
+    summary_text = ai_result.summary or MISSING_TEXT
+    return f"""
+    <section class="ai-panel">
+      <h5>AI 辅助研判 Alpha</h5>
+      <div class="ai-grid">
+        <div class="ai-meta"><strong>评分</strong><span>{_escape(score_text)}</span></div>
+        <div class="ai-meta"><strong>建议</strong><span>{_escape(recommendation_text)}</span></div>
+      </div>
+      <p><strong>摘要：</strong>{_escape(summary_text)}</p>
+      <p><strong>跟进理由：</strong>{_escape(reasons_text)}</p>
+      <p><strong>风险点：</strong>{_escape(risks_text)}</p>
+      <p><strong>建议追问：</strong>{_escape(follow_up_text)}</p>
     </section>
     """
 
