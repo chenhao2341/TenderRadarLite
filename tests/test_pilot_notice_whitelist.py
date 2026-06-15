@@ -326,7 +326,11 @@ class PilotNoticeWhitelistMainTests(unittest.TestCase):
             exit_code = main(["--pilot-notice-ids-file", "examples\\pilot_notice_ids.local.json"])
 
         self.assertEqual(exit_code, 0)
-        run_pilot.assert_called_once_with("examples\\pilot_notice_ids.local.json", execute=False)
+        run_pilot.assert_called_once_with(
+            "examples\\pilot_notice_ids.local.json",
+            execute=False,
+            profile_id="design_consulting",
+        )
 
     def test_main_requires_file_for_execute(self) -> None:
         from app.main import main

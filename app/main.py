@@ -5,6 +5,7 @@ import sys
 
 from .feishu import FeishuClient, FeishuConfigError
 from .logging_utils import setup_logging
+from .profiles import DEFAULT_PROFILE_ID, ProfileNotFoundError
 from .runner import (
     backfill_feishu,
     html_report_path,
@@ -35,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--local-html",
         action="store_true",
         help="Fetch new sources and generate a local HTML report without Feishu",
+    )
+    parser.add_argument(
+        "--profile",
+        default=DEFAULT_PROFILE_ID,
+        help=f"Industry profile to use for local classification (default: {DEFAULT_PROFILE_ID})",
     )
     parser.add_argument("--pilot-notice-ids-file", help="Run notice_id whitelist preview or execute flow")
     parser.add_argument("--dry-run", action="store_true", help="Preview whitelist notices without side effects")
@@ -159,18 +165,30 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--pilot-notice-ids-file cannot be combined with other entrypoints")
 
     if args.local_only:
-        results = run_once(enable_feishu=False)
+        try:
+            results = run_once(enable_feishu=False, profile_id=args.profile)
+        except ProfileNotFoundError as exc:
+            print(str(exc))
+            return 2
         _print_run_results(results)
         return _return_code_for_run(results, logger)
 
     if args.local_structured_preview:
-        results = run_once(enable_feishu=False, structured_preview=True)
+        try:
+            results = run_once(enable_feishu=False, structured_preview=True, profile_id=args.profile)
+        except ProfileNotFoundError as exc:
+            print(str(exc))
+            return 2
         _print_run_results(results)
         print(f"preview_report: {structured_preview_report_path()}")
         return _return_code_for_run(results, logger)
 
     if args.local_html:
-        results = run_once(enable_feishu=False, html_report=True)
+        try:
+            results = run_once(enable_feishu=False, html_report=True, profile_id=args.profile)
+        except ProfileNotFoundError as exc:
+            print(str(exc))
+            return 2
         _print_run_results(results)
         print(f"html_report: {html_report_path()}")
         return _return_code_for_run(results, logger)
@@ -278,14 +296,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.pilot_notice_ids_file:
-        result = run_pilot_notice_whitelist(
-            args.pilot_notice_ids_file,
-            execute=args.execute,
-        )
+        try:
+            result = run_pilot_notice_whitelist(args.pilot_notice_ids_file, execute=args.execute, profile_id=args.profile)
+        except ProfileNotFoundError as exc:
+            print(str(exc))
+            return 2
         _print_pilot_notice_whitelist_result(result)
         return 0
 
-    results = run_once(enable_feishu=True)
+    try:
+        results = run_once(enable_feishu=True, profile_id=args.profile)
+    except ProfileNotFoundError as exc:
+        print(str(exc))
+        return 2
     _print_run_results(results)
     return _return_code_for_run(results, logger)
 

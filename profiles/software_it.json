@@ -1,0 +1,29 @@
+{
+  "profile_id": "software_it",
+  "name": "软件 IT",
+  "description": "Alpha 模板，仅提供基础关键词结构，后续需按真实场景补充。",
+  "positive_keywords": [
+    "软件",
+    "信息化",
+    "系统集成"
+  ],
+  "strong_positive_keywords": [
+    "软件开发",
+    "平台建设"
+  ],
+  "negative_keywords": [
+    "装修",
+    "土建"
+  ],
+  "exclude_keywords": [
+    "食堂",
+    "物业"
+  ],
+  "notice_type_weights": {
+    "ZHAOBIAO_NOTICE": 2,
+    "CHENGQING_NOTICE": 1,
+    "GENGZHENG_NOTICE": 1
+  },
+  "budget_keywords": [],
+  "qualification_keywords": []
+}

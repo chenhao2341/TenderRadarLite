@@ -1,0 +1,29 @@
+{
+  "profile_id": "medical_equipment",
+  "name": "医疗设备",
+  "description": "Alpha 模板，仅提供基础关键词结构，后续需按设备采购和维保场景细化。",
+  "positive_keywords": [
+    "医疗设备",
+    "器械",
+    "影像"
+  ],
+  "strong_positive_keywords": [
+    "设备采购",
+    "设备维保"
+  ],
+  "negative_keywords": [
+    "规划设计",
+    "景观设计"
+  ],
+  "exclude_keywords": [
+    "物业",
+    "食堂"
+  ],
+  "notice_type_weights": {
+    "ZHAOBIAO_NOTICE": 2,
+    "CHENGQING_NOTICE": 1,
+    "GENGZHENG_NOTICE": 1
+  },
+  "budget_keywords": [],
+  "qualification_keywords": []
+}

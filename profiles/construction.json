@@ -1,0 +1,29 @@
+{
+  "profile_id": "construction",
+  "name": "工程建设",
+  "description": "Alpha 模板，仅提供基础关键词结构，后续需按工程细分领域校准。",
+  "positive_keywords": [
+    "施工",
+    "建设",
+    "改造"
+  ],
+  "strong_positive_keywords": [
+    "施工总承包",
+    "专业承包"
+  ],
+  "negative_keywords": [
+    "设计咨询",
+    "可行性研究"
+  ],
+  "exclude_keywords": [
+    "办公用品",
+    "食堂"
+  ],
+  "notice_type_weights": {
+    "ZHAOBIAO_NOTICE": 2,
+    "CHENGQING_NOTICE": 1,
+    "GENGZHENG_NOTICE": 1
+  },
+  "budget_keywords": [],
+  "qualification_keywords": []
+}

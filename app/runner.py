@@ -13,6 +13,7 @@ from .html_report import open_html_report, write_html_report
 from .keywords import build_keyword_text, match_keywords
 from .logging_utils import setup_logging
 from .models import Notice
+from .profiles import DEFAULT_PROFILE_ID, load_profile
 from .preview_report import classify_notice, write_structured_preview_report
 from .storage import NoticeMatchStatus, Storage
 
@@ -133,10 +134,12 @@ def run_once(
     enable_feishu: bool = True,
     structured_preview: bool = False,
     html_report: bool = False,
+    profile_id: str = DEFAULT_PROFILE_ID,
 ) -> list[RunSummary]:
     ensure_runtime_dirs()
     logger = setup_logging()
     keywords = load_keywords()
+    profile = load_profile(profile_id)
     storage = Storage(DATA_DIR / "bids.db")
     feishu = None
     if enable_feishu:
@@ -169,7 +172,7 @@ def run_once(
             for notice in notices:
                 keyword_text = build_keyword_text(notice)
                 notice.hit_keywords = match_keywords(keyword_text, keywords)
-                classification = classify_notice(notice)
+                classification = classify_notice(notice, profile=profile)
                 notice.lead_tier = str(classification["lead_tier"])
                 notice.lead_reason = str(classification["lead_reason"])
                 notice.matched_positive_signals = list(classification["matched_positive_signals"])
@@ -309,6 +312,7 @@ def run_once(
             html_report_path(),
             html_notices,
             source_count=len(enabled_sources),
+            profile_name=str(profile.get("name", profile_id)),
         )
         if not open_html_report(report_path):
             logger.warning("failed to auto-open local HTML report: %s", report_path)
@@ -393,10 +397,12 @@ def run_pilot_notice_whitelist(
     pilot_notice_ids_file: str | Path,
     *,
     execute: bool = False,
+    profile_id: str = DEFAULT_PROFILE_ID,
 ) -> PilotNoticeWhitelistSummary:
     ensure_runtime_dirs()
     logger = setup_logging()
     keywords = load_keywords()
+    profile = load_profile(profile_id)
     storage = Storage(DATA_DIR / "bids.db")
     feishu = None
     if execute:
@@ -424,7 +430,7 @@ def run_pilot_notice_whitelist(
                 continue
             keyword_text = build_keyword_text(notice)
             notice.hit_keywords = match_keywords(keyword_text, keywords)
-            classification = classify_notice(notice)
+            classification = classify_notice(notice, profile=profile)
             notice.lead_tier = str(classification["lead_tier"])
             notice.lead_reason = str(classification["lead_reason"])
             notice.matched_positive_signals = list(classification["matched_positive_signals"])

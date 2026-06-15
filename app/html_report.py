@@ -66,11 +66,17 @@ def write_html_report(
     *,
     source_count: int = 0,
     generated_at: str | None = None,
+    profile_name: str | None = None,
 ) -> Path:
     notice_list = list(notices)
     output_path = path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    html_text = build_html_report(notice_list, source_count=source_count, generated_at=generated_at)
+    html_text = build_html_report(
+        notice_list,
+        source_count=source_count,
+        generated_at=generated_at,
+        profile_name=profile_name,
+    )
     output_path.write_text(html_text, encoding="utf-8")
     return output_path
 
@@ -80,6 +86,7 @@ def build_html_report(
     *,
     source_count: int = 0,
     generated_at: str | None = None,
+    profile_name: str | None = None,
 ) -> str:
     timestamp = generated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     projects = aggregate_notices(notices)

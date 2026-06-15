@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .models import Notice
+from .profiles import load_profile
 
 
 KEY_FIELDS = [
@@ -39,7 +40,7 @@ REQUIRED_FIELDS = [
 ]
 
 MANUAL_WATCHLIST_PROJECTS = {
-    "衡南县城镇供水扩容及管网漏损治理项目",
+    "衡南县城乡供水扩容及管网漏损治理项目",
     "衡山县第四中学综合楼建设项目",
     "衡山县城市供水提质改造及智慧水务建设项目(供水管网改造一期)",
     "衡阳市直管公房危旧房改造项目（二期）",
@@ -158,7 +159,7 @@ def evaluate_notice(notice: Notice, today: str | None = None) -> dict[str, str]:
     fields_reason = "核心字段齐全" if not missing_required else f"缺少核心字段: {', '.join(missing_required)}"
     classification = classify_notice(notice, today=today)
     recommend = "是" if classification["lead_tier"] in {"DIRECT", "WATCHLIST"} and is_recent_notice(notice.publish_time, today=today) else "否"
-    reason = classification["lead_reason"]
+    reason = str(classification["lead_reason"])
     if not is_recent_notice(notice.publish_time, today=today):
         reason = f"非近期公告；{reason}"
     if not notice.original_url or not notice.content_summary:
@@ -171,18 +172,37 @@ def evaluate_notice(notice: Notice, today: str | None = None) -> dict[str, str]:
     }
 
 
-def classify_notice(notice: Notice, today: str | None = None) -> dict[str, str | list[str]]:
-    text_parts = [
-        notice.project_name,
-        notice.section_name,
-        notice.content_summary,
-        notice.qualification_summary,
-        notice.procurement_method,
-        notice.notice_type,
-    ]
-    text = " ".join(part for part in text_parts if part)
-    positive_signals = _collect_matches(text, DIRECT_SIGNALS + WATCHLIST_SIGNALS)
-    negative_signals = _collect_matches(text, EXCLUDE_SIGNALS + DIRECT_BLOCKERS)
+def classify_notice(
+    notice: Notice,
+    today: str | None = None,
+    *,
+    profile: dict | None = None,
+) -> dict[str, str | list[str]]:
+    active_profile = profile or load_profile()
+    text = " ".join(
+        part
+        for part in [
+            notice.project_name,
+            notice.section_name,
+            notice.content_summary,
+            notice.qualification_summary,
+            notice.procurement_method,
+            notice.notice_type,
+        ]
+        if part
+    )
+
+    strong_positive_keywords = list(active_profile.get("strong_positive_keywords", []))
+    positive_keywords = list(active_profile.get("positive_keywords", []))
+    negative_keywords = list(active_profile.get("negative_keywords", []))
+    exclude_keywords = list(active_profile.get("exclude_keywords", []))
+
+    positive_signals = _unique_preserve_order(
+        _collect_matches(text, strong_positive_keywords + DIRECT_SIGNALS + positive_keywords + WATCHLIST_SIGNALS)
+    )
+    negative_signals = _unique_preserve_order(
+        _collect_matches(text, exclude_keywords + EXCLUDE_SIGNALS + negative_keywords + DIRECT_BLOCKERS)
+    )
     if notice.hit_keywords:
         for keyword in notice.hit_keywords:
             if keyword not in positive_signals:
@@ -198,7 +218,13 @@ def classify_notice(notice: Notice, today: str | None = None) -> dict[str, str |
             "matched_negative_signals": negative_signals,
         }
 
-    if _contains_any(text, EXCLUDE_SIGNALS):
+    has_direct_signal = _contains_any(text, strong_positive_keywords + DIRECT_SIGNALS + positive_keywords) or bool(notice.hit_keywords)
+    has_watchlist_signal = _contains_any(text, WATCHLIST_SIGNALS)
+    has_direct_blocker = _contains_any(notice.qualification_summary, DIRECT_BLOCKERS)
+    has_negative_signal = _contains_any(text, negative_keywords + DIRECT_BLOCKERS)
+    has_exclude_signal = _contains_any(text, exclude_keywords + EXCLUDE_SIGNALS)
+
+    if has_exclude_signal:
         return {
             "lead_tier": "EXCLUDE",
             "lead_reason": "标题或正文出现明显无关的货物/设备采购信号，排除。",
@@ -206,11 +232,7 @@ def classify_notice(notice: Notice, today: str | None = None) -> dict[str, str |
             "matched_negative_signals": negative_signals or ["明显无关类别"],
         }
 
-    has_direct_signal = _contains_any(text, DIRECT_SIGNALS) or bool(notice.hit_keywords)
-    has_watchlist_signal = _contains_any(text, WATCHLIST_SIGNALS)
-    has_direct_blocker = _contains_any(notice.qualification_summary, DIRECT_BLOCKERS)
-
-    if has_direct_signal and not has_direct_blocker and not _contains_any(text, ["施工总承包", "设备采购", "货物采购"]):
+    if has_direct_signal and not has_direct_blocker and not has_negative_signal and not has_exclude_signal:
         return {
             "lead_tier": "DIRECT",
             "lead_reason": "标题/摘要/资质要求明确属于设计/规划/咨询服务，可作为直接商机。",
@@ -218,7 +240,7 @@ def classify_notice(notice: Notice, today: str | None = None) -> dict[str, str |
             "matched_negative_signals": negative_signals,
         }
 
-    if has_watchlist_signal or (has_direct_signal and has_direct_blocker):
+    if has_watchlist_signal or (has_direct_signal and has_negative_signal):
         blocker_text = "当前存在施工资质或工程实施导向，不应进入 DIRECT。"
         reason = "存在改造、城市更新或公共建设延伸信号，建议作为关联观察。" if not has_direct_blocker else blocker_text
         return {
@@ -266,6 +288,17 @@ def _collect_matches(text: str, keywords: list[str]) -> list[str]:
 
 def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(keyword in text for keyword in keywords)
+
+
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
 
 
 def _render_section(title: str, notices: list[Notice]) -> list[str]:
