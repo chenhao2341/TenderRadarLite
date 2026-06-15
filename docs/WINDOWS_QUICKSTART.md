@@ -1,65 +1,74 @@
-﻿# TenderRadarLite Windows Quick Start
+# Windows 快速开始
 
-## 閫傜敤浜虹兢
+## 适用人群
 
-鏈鏄庨€傜敤浜庡笇鏈涘湪 Windows 鏈湴杩愯 TenderRadarLite 骞剁敓鎴?HTML 鎶ュ憡鐨勭敤鎴枫€?
-鏈湴 HTML 鎶ュ憡妯″紡涓嶄緷璧栭涔︼紝涓嶉渶瑕?App Secret锛屼笉闇€瑕?Webhook锛屼篃涓嶉渶瑕?`chat_id`銆?椋炰功灞炰簬楂樼骇鍙€夊姛鑳斤紝涓嶆槸 Windows 鏈湴鎶ュ憡鐨勫繀闇€椤广€?
-## 绗竴娆′娇鐢ㄥ墠
+这份说明适合希望在 Windows 本地运行 TenderRadarLite 并生成本地 HTML 报告的用户。
 
-1. 瀹夎 Python 3.11 鎴栨洿楂樼増鏈紝骞剁‘璁?`python` 鍛戒护鍙敤銆?2. 杩涘叆椤圭洰鏍圭洰褰?`D:\TenderRadarLite`銆?3. 鍙€夊垱寤鸿櫄鎷熺幆澧冿細
+本地 HTML 报告模式不依赖飞书，不需要 App Secret，不需要 Webhook，也不需要 `chat_id`。飞书属于高级可选功能，不是 Windows 本地报告的前置条件。
+
+## 首次使用前
+
+1. 安装 Python 3.11 或更高版本，并确认 `python` 命令可用。
+2. 进入项目根目录 `D:\TenderRadarLite`。
+3. 可选创建虚拟环境：
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-4. 瀹夎渚濊禆锛?
+4. 安装依赖：
+
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-## 鎺ㄨ崘浣跨敤娴佺▼
+## 推荐使用流程
 
-1. 鍙屽嚮 `scripts\妫€鏌ヨ繍琛岀幆澧?bat`
-2. 鍙屽嚮 `scripts\鍚姩鏈湴鎷涙姇鏍囨姤鍛?bat`
-3. 鎵撳紑 `reports\latest.html` 鏌ョ湅鏈€鏂版湰鍦版姤鍛?
-## 甯哥敤鑴氭湰璇存槑
+1. 双击 `scripts/检查运行环境.bat`
+2. 双击 `scripts/启动本地招投标报告.bat`
+3. 打开 `reports/latest.html` 查看最新本地报告
 
-### `scripts\鍚姩鏈湴鎷涙姇鏍囨姤鍛?bat`
+## 脚本说明
 
-- 鎵ц `python run_mvp.py --local-html`
-- 鐢熸垚鏈湴 HTML 鎶ュ憡 `reports\latest.html`
-- 鎴愬姛鍚庣敱 Python 鍐呴儴鑷姩灏濊瘯鎵撳紑娴忚鍣?- 澶辫触鏃剁獥鍙ｄ細鍋滅暀锛屾柟渚挎煡鐪嬮敊璇?
-### `scripts\鎵撳紑鏈€鏂版姤鍛?bat`
+### `scripts/启动本地招投标报告.bat`
 
-- 鐩存帴鎵撳紑 `reports\latest.html`
-- 涓嶈繍琛屾姄鍙?- 濡傛灉鎶ュ憡涓嶅瓨鍦紝浼氭彁绀哄厛杩愯 `鍚姩鏈湴鎷涙姇鏍囨姤鍛?bat`
+- 执行 `python run_mvp.py --local-html`
+- 生成本地 HTML 报告 `reports/latest.html`
+- 成功后由 Python 内部尝试自动打开浏览器
 
-### `scripts\鏌ョ湅杩愯鏃ュ織.bat`
+### `scripts/打开最新报告.bat`
 
-- 鎵撳紑 `logs\` 鐩綍
-- 鏂逛究鏌ョ湅鏈湴杩愯鏃ュ織
-- 涓嶈繍琛屾姄鍙栵紝涓嶈Е鍙戦涔?
-### `scripts\妫€鏌ヨ繍琛岀幆澧?bat`
+- 直接打开 `reports/latest.html`
+- 不重新抓取数据
 
-- 妫€鏌ュ綋鍓嶇洰褰曟槸鍚︽纭?- 妫€鏌?Python 鏄惁鍙敤鍙婄増鏈?- 妫€鏌?`requirements.txt`銆乣run_mvp.py`銆乣data/`銆乣logs/`銆乣reports/`
-- 妫€鏌ュ叧閿緷璧栨槸鍚﹀彲瀵煎叆
-- 涓嶈嚜鍔ㄥ畨瑁呬緷璧栵紝涓嶈嚜鍔ㄥ垱寤鸿櫄鎷熺幆澧?
-## 甯歌闂
+### `scripts/查看运行日志.bat`
 
-### 鍙屽嚮闂€€鎬庝箞鍔?
-鍏堝弻鍑?`scripts\妫€鏌ヨ繍琛岀幆澧?bat`銆傝鑴氭湰浼氬仠鐣欑獥鍙ｏ紝骞舵彁绀虹己灏?Python銆佷緷璧栨垨鐩綍鐨勯棶棰樸€?
-### Python 鏈畨瑁呮€庝箞鍔?
-鍏堝畨瑁?Python 3.11 鎴栨洿楂樼増鏈紝骞剁‘璁ゅ湪鍛戒护琛屼腑鎵ц `python --version` 鑳界湅鍒扮増鏈彿銆?
-### 渚濊禆缂哄け鎬庝箞鍔?
-鍦ㄩ」鐩牴鐩綍鎵ц锛?
-```powershell
-python -m pip install -r requirements.txt
-```
+- 打开 `logs/` 目录
+- 方便查看本地运行日志
 
-### 娌℃湁鐢熸垚鎶ュ憡鎬庝箞鍔?
-鍏堟煡鐪?`scripts\鍚姩鏈湴鎷涙姇鏍囨姤鍛?bat` 绐楀彛涓殑閿欒鎻愮ず锛屽啀鎵撳紑 `logs\` 鏌ョ湅褰撳ぉ鏃ュ織銆?
-### `reports/latest.html` 鍦ㄥ摢閲?
-璺緞涓洪」鐩牴鐩綍涓嬬殑 `reports\latest.html`銆?
-### 鏃ュ織鍦ㄥ摢閲?
-璺緞涓洪」鐩牴鐩綍涓嬬殑 `logs\` 鐩綍銆?
+### `scripts/检查运行环境.bat`
+
+- 检查当前目录是否正确
+- 检查 Python 是否可用
+- 检查 `requirements.txt`、`run_mvp.py`、`data/`、`logs/`、`reports/`
+- 检查关键依赖是否可导入
+- 不自动安装依赖，不自动修改环境
+
+## 常见问题
+
+### 双击后窗口一闪而过
+
+先运行 `scripts/检查运行环境.bat`，根据停留窗口里的提示补齐 Python 或依赖问题。
+
+### 没有生成报告
+
+先检查脚本窗口输出，再查看 `logs/` 目录中的本地运行日志。
+
+### `reports/latest.html` 在哪里
+
+位于项目根目录下的 `reports/latest.html`。
+
+### 没有飞书配置也能用吗
+
+可以。本地 HTML 是默认可用路径。
