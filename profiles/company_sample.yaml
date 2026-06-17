@@ -1,0 +1,49 @@
+company_name: "某某设计咨询有限公司"
+regions:
+  - 湖南
+  - 衡阳
+  - 长沙
+
+business_scope:
+  - 规划设计
+  - 工程咨询
+  - 可研报告
+  - 勘察设计
+
+target_project_types:
+  - 设计服务
+  - 咨询服务
+  - 可研
+  - 规划编制
+  - 勘察
+  - 初步设计
+
+exclude_project_types:
+  - 施工总承包
+  - 纯材料采购
+  - 设备采购
+  - 物业服务
+  - 劳务外包
+
+qualifications:
+  - 市政行业设计乙级
+  - 建筑行业设计乙级
+  - 工程咨询备案
+
+budget_preference:
+  min_amount: 500000
+  preferred_unit: 元
+  note: "金额单位不明确时不直接过滤"
+
+notice_type_preference:
+  high:
+    - 招标公告
+    - 采购公告
+    - 重新招标公告
+  medium:
+    - 更正公告
+    - 澄清公告
+    - 流标公告
+  low:
+    - 中标公告
+    - 合同公告
