@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..amount_utils import RAW_TEXT_SOURCE, parse_amount_context
+from ..attachment_utils import apply_attachment_result, discover_attachments
 from ..html_extract import html_to_text
 from ..models import Notice
 from .base import BaseAdapter
@@ -34,26 +35,34 @@ class HengyangProcurementAdapter(BaseAdapter):
         )
         ann_payload = self.fetcher.get_json(raw_api_url) or {}
         ann_list = ((ann_payload.get("data") or {}).get("governmentProcureAnnouncementInformation")) or []
-        if ann_payload.get("code") != 200 or not ann_list:
-            return None
+        detail_available = ann_payload.get("code") == 200 and bool(ann_list)
+        if not detail_available:
+            return {
+                "detail_checked": True,
+                "detail_available": False,
+                "detail": project_payload.get("data") or {},
+                "raw_api_url": raw_api_url,
+                "structured_attachments": ((project_payload.get("data") or {}).get("GovernmentPurchaseFile")) or [],
+                "detail_risk_note": "详情页不可访问或解析失败",
+            }
 
         return {
+            "detail_checked": True,
+            "detail_available": True,
             "detail": project_payload.get("data") or {},
             "announcement": ann_list[0],
             "raw_api_url": raw_api_url,
+            "structured_attachments": ((project_payload.get("data") or {}).get("GovernmentPurchaseFile")) or [],
         }
 
     def normalize(self, item: dict[str, Any], detail: dict[str, Any] | None = None) -> Notice:
-        if not detail:
-            raise ValueError("procurement detail is required")
-
         section_id = (item.get("bidSectionId") or "").strip()
-        payload = detail.get("detail") or {}
+        payload = (detail or {}).get("detail") or {}
         project = payload.get("governmentProcurementProjectInformation") or {}
         section_list = payload.get("GovernmentProcureSectionInformationList") or []
-        files = payload.get("GovernmentPurchaseFile") or []
+        files = (detail or {}).get("structured_attachments") or payload.get("GovernmentPurchaseFile") or []
         section = section_list[0] if section_list else {}
-        ann = detail.get("announcement") or {}
+        ann = (detail or {}).get("announcement") or {}
         notice_html = ann.get("noticeContent") or ""
         notice_text = html_to_text(notice_html)
         content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
@@ -68,7 +77,7 @@ class HengyangProcurementAdapter(BaseAdapter):
             field_hints=("最高", "限价", "控制价"),
         )
 
-        return Notice(
+        notice = Notice(
             source=self.source_config.get("source", "衡阳分平台"),
             source_subtype=self.source_config.get("source_subtype", "政府采购交易"),
             dedupe_key=f"{self.source_name}|{section_id}",
@@ -95,18 +104,29 @@ class HengyangProcurementAdapter(BaseAdapter):
             content_summary=content_summary,
             qualification_summary=qualification_summary,
             accepts_consortium=consortium,
-            original_url=str(detail.get("raw_api_url") or ""),
+            original_url=str((detail or {}).get("raw_api_url") or ""),
             employee_readable_url="",
-            raw_api_url=str(detail.get("raw_api_url") or ""),
-            has_attachment=bool(files),
-            attachment_count=len(files),
+            raw_api_url=str((detail or {}).get("raw_api_url") or ""),
             fetched_at=self.now_string(),
         )
+        apply_attachment_result(
+            notice,
+            discover_attachments(
+                detail_checked=bool((detail or {}).get("detail_checked")),
+                detail_available=bool((detail or {}).get("detail_available")),
+                detail_html=notice_html,
+                base_url=notice.raw_api_url or self.url,
+                structured_records=files,
+                detail_risk_note=(detail or {}).get("detail_risk_note"),
+            ),
+        )
+        return notice
 
     def crawl(self) -> list[Notice]:
         notices: list[Notice] = []
         detail_success = 0
         skipped = 0
+        inaccessible_count = 0
 
         for item in self.fetch_list():
             if not (item.get("bidSectionId") or "").strip():
@@ -118,16 +138,21 @@ class HengyangProcurementAdapter(BaseAdapter):
                 skipped += 1
                 continue
 
-            notices.append(self.normalize(item, detail))
-            detail_success += 1
+            notice = self.normalize(item, detail)
+            notices.append(notice)
+            if notice.detail_available:
+                detail_success += 1
+            else:
+                inaccessible_count += 1
 
         list_stats = getattr(self, "_list_stats", {})
         self.last_crawl_stats = {
             "list_count": list_stats.get("fetched_total", 0),
             "detail_success_count": detail_success,
             "skipped_count": skipped,
-            "real_notice_count": detail_success,
+            "real_notice_count": len(notices),
             "fetch_failed": list_stats.get("fetch_failed", 0),
+            "detail_unavailable_count": inaccessible_count,
         }
         return notices
 

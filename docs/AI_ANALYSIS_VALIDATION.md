@@ -76,3 +76,12 @@
 - When the source field is numeric-only but the current notice text clearly contains `元 / 万元 / 亿元`, the runtime context recovers that unit from the notice text and passes it to both HTML and AI.
 - When the current source data and notice text still do not confirm the unit, HTML shows `单位未确认` and AI is required to keep the value unconverted.
 - `单位未确认` does not mean the project has no value; AI should still judge follow-up value from grounded non-amount signals and recommend manual re-check where appropriate.
+
+## Task 4-D attachment-review guardrails
+
+- AI prompt now receives detail-page status, attachment count, coarse attachment flags, and up to five attachment titles.
+- AI may use attachment discovery as a reason to suggest manual follow-up.
+- AI must not claim that it has read the full attachment text.
+- AI must not invent attachment content from title alone.
+- If the detail page is unavailable, AI should explicitly suggest opening the original link for manual review.
+- If no attachment is found, AI must not conclude that the project has no value only from that absence.

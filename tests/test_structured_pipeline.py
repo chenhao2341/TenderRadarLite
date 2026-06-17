@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from app.attachment_utils import detect_attachment_category, detect_file_type, extract_attachments_from_html
 from app.feishu import OFFICIAL_PLATFORM_URL, PRIMARY_FIELD_NAME, SCHEMA_FIELDS, FeishuClient
 from app.models import Notice
 from app.storage import Storage
@@ -92,6 +93,38 @@ class StructuredStorageTests(unittest.TestCase):
 
 
 class AdapterBehaviorTests(unittest.TestCase):
+    def test_attachment_helper_extracts_links_types_and_categories_from_html(self) -> None:
+        html = """
+        <div>
+          <a href="/files/招标文件.pdf">招标文件.pdf</a>
+          <a href="https://example.com/bill/工程量清单.xlsx">工程量清单.xlsx</a>
+          <a href="/download/更正公告.docx">更正公告.docx</a>
+          <a href="/archives/报价表.xls">报价表.xls</a>
+          <a href="/bundle/附件.zip">附件.zip</a>
+          <a href="/bundle/附件.rar">附件.rar</a>
+        </div>
+        """
+
+        attachments = extract_attachments_from_html(html, base_url="https://example.com/detail")
+
+        self.assertEqual([item.title for item in attachments[:3]], ["招标文件.pdf", "工程量清单.xlsx", "更正公告.docx"])
+        self.assertEqual(detect_file_type("/files/a.pdf"), "PDF")
+        self.assertEqual(detect_file_type("/files/a.doc"), "DOC")
+        self.assertEqual(detect_file_type("/files/a.docx"), "DOCX")
+        self.assertEqual(detect_file_type("/files/a.xls"), "XLS")
+        self.assertEqual(detect_file_type("/files/a.xlsx"), "XLSX")
+        self.assertEqual(detect_file_type("/files/a.zip"), "ZIP")
+        self.assertEqual(detect_file_type("/files/a.rar"), "RAR")
+        self.assertEqual(detect_attachment_category("招标文件.pdf"), "bidding_file")
+        self.assertEqual(detect_attachment_category("采购文件.doc"), "procurement_file")
+        self.assertEqual(detect_attachment_category("工程量清单.xlsx"), "bill_file")
+        self.assertEqual(detect_attachment_category("报价表.xls"), "bill_file")
+        self.assertEqual(detect_attachment_category("最高限价说明.doc"), "bill_file")
+        self.assertEqual(detect_attachment_category("更正公告.docx"), "correction_file")
+        self.assertEqual(detect_attachment_category("澄清说明.pdf"), "correction_file")
+        self.assertEqual(detect_attachment_category("答疑文件.pdf"), "correction_file")
+        self.assertEqual(detect_attachment_category("补遗通知.pdf"), "correction_file")
+
     def test_procurement_adapter_fetch_normalize_pipeline_preserves_key_fields(self) -> None:
         from app.adapters.hengyang_procurement import HengyangProcurementAdapter
 
@@ -199,9 +232,14 @@ class AdapterBehaviorTests(unittest.TestCase):
         self.assertEqual(notice.ceiling_price_unit, "元")
         self.assertEqual(notice.original_url, ann_url)
         self.assertEqual(notice.raw_api_url, ann_url)
+        self.assertTrue(notice.detail_checked)
+        self.assertTrue(notice.detail_available)
+        self.assertEqual(notice.attachments_found, 1)
+        self.assertEqual(notice.attachments[0].title, "file1.pdf")
+        self.assertEqual(notice.attachments[0].file_type, "PDF")
         self.assertTrue(notice.dedupe_key)
 
-    def test_procurement_adapter_skips_sections_without_real_notice(self) -> None:
+    def test_procurement_adapter_marks_sections_without_real_notice_as_detail_unavailable(self) -> None:
         from app.adapters.hengyang_procurement import HengyangProcurementAdapter
 
         list_url = (
@@ -306,10 +344,77 @@ class AdapterBehaviorTests(unittest.TestCase):
             fetcher=fetcher,
         )
         notices = adapter.crawl()
-        self.assertEqual(len(notices), 1)
+        self.assertEqual(len(notices), 2)
         self.assertEqual(notices[0].section_id, "sec-1")
+        self.assertTrue(notices[0].detail_available)
         self.assertEqual(notices[0].project_code, "PC-1")
         self.assertEqual(notices[0].procurement_method, "Competitive Negotiation")
+        self.assertEqual(notices[1].section_id, "sec-2")
+        self.assertFalse(notices[1].detail_available)
+        self.assertEqual(notices[1].detail_risk_note, "详情页不可访问或解析失败")
+
+    def test_procurement_adapter_keeps_notice_when_detail_is_unavailable(self) -> None:
+        from app.adapters.hengyang_procurement import HengyangProcurementAdapter
+
+        list_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/"
+            "projectInformation/selectAll?regionCode=430400&current=1&size=10"
+        )
+        section_id = "sec-unavailable"
+        project_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/"
+            f"getBySectionId?sectionId={section_id}"
+        )
+        ann_url = (
+            "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/"
+            f"getAnnouncementBySectionId?sectionId={section_id}"
+        )
+        fetcher = FakeFetcher(
+            {
+                list_url: {
+                    "data": {
+                        "records": [
+                            {
+                                "bidSectionId": section_id,
+                                "projectId": "proj-1",
+                                "purchaseProjectName": "Project Unavailable",
+                                "purchaseSectionName": "Package One",
+                                "regionName": "Hengyang",
+                                "noticeType": "Tender Notice",
+                                "noticeSendTime": "2026-06-11 10:00:00",
+                            }
+                        ]
+                    }
+                },
+                project_url: {
+                    "data": {
+                        "governmentProcurementProjectInformation": {
+                            "purchaseProjectName": "Project Unavailable",
+                            "purchaseProjectCode": "PC-1",
+                        },
+                        "GovernmentProcureSectionInformationList": [{"id": section_id, "purchaseSectionName": "Package One"}],
+                        "GovernmentPurchaseFile": [],
+                    }
+                },
+                ann_url: {"code": 500, "msg": "unavailable", "data": None},
+            }
+        )
+
+        adapter = HengyangProcurementAdapter(
+            source_name="procurement",
+            url=list_url,
+            region="Hengyang",
+            fetcher=fetcher,
+            source_config={"source": "source", "source_subtype": "procurement"},
+        )
+
+        notices = adapter.crawl()
+
+        self.assertEqual(len(notices), 1)
+        self.assertTrue(notices[0].detail_checked)
+        self.assertFalse(notices[0].detail_available)
+        self.assertEqual(notices[0].detail_risk_note, "详情页不可访问或解析失败")
+        self.assertEqual(notices[0].attachments_found, 0)
 
     def test_construction_adapter_builds_hash_detail_url(self) -> None:
         from app.adapters.hengyang_construction import HengyangConstructionAdapter
@@ -502,6 +607,10 @@ class AdapterBehaviorTests(unittest.TestCase):
         )
         self.assertEqual(notice.original_url, notice.employee_readable_url)
         self.assertEqual(notice.raw_api_url, notice_url)
+        self.assertTrue(notice.detail_checked)
+        self.assertTrue(notice.detail_available)
+        self.assertEqual(notice.attachments_found, 1)
+        self.assertEqual(notice.attachments[0].file_type, "PDF")
         self.assertTrue(notice.dedupe_key)
 
 
@@ -828,6 +937,61 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Direct Project", html)
         self.assertIn("DIRECT reason", html)
         self.assertIn('href="https://example.com/direct"', html)
+
+    def test_write_html_report_renders_attachment_panel(self) -> None:
+        from app.models import AttachmentInfo
+        from app.html_report import write_html_report
+
+        notice = self._sample_notice("DIRECT", "Attachment Project", "attachment")
+        notice.detail_checked = True
+        notice.detail_available = True
+        notice.attachments_found = 2
+        notice.attachments = [
+            AttachmentInfo(title="招标文件.pdf", url="https://example.com/files/a.pdf", file_type="PDF", category="bidding_file", source="detail_page"),
+            AttachmentInfo(title="工程量清单.xlsx", url="https://example.com/files/b.xlsx", file_type="XLSX", category="bill_file", source="detail_page"),
+        ]
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("详情/附件", html)
+        self.assertIn("发现附件：2 个", html)
+        self.assertIn("招标文件.pdf", html)
+        self.assertIn("工程量清单.xlsx", html)
+
+    def test_write_html_report_handles_missing_attachments_without_crashing(self) -> None:
+        from app.html_report import write_html_report
+
+        notice = self._sample_notice("WATCHLIST", "No Attachment Project", "no-attachment")
+        notice.detail_checked = True
+        notice.detail_available = True
+        notice.attachments_found = 0
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("详情/附件", html)
+        self.assertIn("发现附件：0 个", html)
+
+    def test_write_html_report_marks_detail_unavailable(self) -> None:
+        from app.html_report import write_html_report
+
+        notice = self._sample_notice("WATCHLIST", "Unavailable Detail Project", "detail-unavailable")
+        notice.detail_checked = True
+        notice.detail_available = False
+        notice.detail_risk_note = "详情页不可访问或解析失败"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("详情页不可访问或解析失败", html)
+        self.assertIn("请人工打开原文链接复核", html)
 
     def test_write_html_report_renders_empty_state(self) -> None:
         from app.html_report import write_html_report

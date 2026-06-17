@@ -95,3 +95,18 @@ tests/
 - Adapters keep the original numeric `budget_amount` / `ceiling_price` values and try to recover unit evidence from the current notice text.
 - Recovered evidence is passed forward as runtime-only context such as unit, unit source, and raw text snippet; this avoids a SQLite schema change.
 - HTML and AI share the same amount-context interpretation so the display layer and prompt layer do not diverge on unit handling.
+
+## Task 4-D Attachment Discovery Alpha
+
+- Task 4-D adds a lightweight `公告详情与附件发现 Alpha` layer between notice discovery and report rendering.
+- The scope is limited to:
+  - checking whether the current source detail page or detail API is available,
+  - discovering explicit attachment links or structured attachment entries,
+  - identifying attachment title, coarse file type, and coarse category,
+  - surfacing the result in local HTML and AI prompt context.
+- The runtime helper lives in `app/attachment_utils.py`.
+- `Notice` now carries runtime-only attachment review fields such as `detail_checked`, `detail_available`, `attachments`, `attachments_found`, and `detail_risk_note`.
+- These fields are not persisted to SQLite, so Task 4-D does not require any schema change.
+- Current adapters only inspect already-enabled Hengyang sources and do not expand source coverage.
+- The implementation does not download attachment bodies and does not parse PDF, Word, Excel, OCR, or RAG content.
+- Attachment title and coarse type are treated only as manual-review clues; final judgement must still use the original notice and original attachments.

@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 import requests
 
+from .attachment_utils import ATTACHMENT_REVIEW_HINT, attachment_titles_summary
 from .amount_utils import (
     amount_unit_source_label,
     build_amount_context_from_notice,
@@ -162,6 +163,16 @@ def build_notice_analysis_prompt(notice: Notice, *, profile_name: str = "") -> s
         ),
         "content_summary": notice.content_summary or MISSING_TEXT,
         "qualification_summary": notice.qualification_summary or MISSING_TEXT,
+        "detail_page_status": _detail_status_for_prompt(notice),
+        "attachment_count": notice.attachments_found,
+        "has_likely_bidding_file": _yes_no_unknown(notice.has_likely_bidding_file, notice.detail_checked),
+        "has_likely_procurement_file": _yes_no_unknown(notice.has_likely_procurement_file, notice.detail_checked),
+        "has_likely_bill_file": _yes_no_unknown(notice.has_likely_bill_file, notice.detail_checked),
+        "has_likely_correction_file": _yes_no_unknown(notice.has_likely_correction_file, notice.detail_checked),
+        "attachment_title_summary": attachment_titles_summary(notice, max_items=5) or [MISSING_TEXT],
+        "attachment_review_hint": ATTACHMENT_REVIEW_HINT,
+        "attachment_guardrail": "不得声称已阅读附件全文，不得根据附件标题编造附件内容",
+        "detail_risk_note": notice.detail_risk_note or MISSING_TEXT,
         "lead_tier": notice.lead_tier or MISSING_TEXT,
         "lead_reason": notice.lead_reason or MISSING_TEXT,
         "matched_positive_signals": notice.matched_positive_signals or [],
@@ -306,12 +317,13 @@ def _apply_amount_unit_guardrails(result: AIAnalysisResult, notice: Notice) -> A
     if not _needs_amount_unit_warning(notice):
         return result
 
+    mentioned_units_before = _mentions_amount_units(result) or _mentions_amount_units_safe(result)
     result.summary = _sanitize_unconfirmed_amount_units(result.summary, notice)
     result.reasons = [_sanitize_unconfirmed_amount_units(text, notice) for text in result.reasons]
     result.risks = [_sanitize_unconfirmed_amount_units(text, notice) for text in result.risks]
     result.follow_up_questions = [_sanitize_unconfirmed_amount_units(text, notice) for text in result.follow_up_questions]
 
-    if _mentions_amount_units(result):
+    if mentioned_units_before or _mentions_amount_units_safe(result):
         if AMOUNT_UNIT_RISK_TEXT not in result.risks:
             result.risks.append(AMOUNT_UNIT_RISK_TEXT)
     return result
@@ -333,12 +345,31 @@ def _sanitize_unconfirmed_amount_units(text: str, notice: Notice) -> str:
         return normalized
 
     sanitized = normalized
+    confirmed_mentions = {
+        f"{context.raw_value}{context.unit}"
+        for context in _notice_amount_contexts(notice)
+        if context.raw_value and context.unit
+    }
     for context in _notice_amount_contexts(notice):
         raw = context.raw_value
         if not raw or context.unit:
             continue
         pattern = re.compile(rf"{re.escape(raw)}\s*(?:元|万元|亿元)")
         sanitized = pattern.sub(f"金额原始数值为{raw}，单位未确认", sanitized)
+    generic_pattern = re.compile(r"(\d(?:[\d.,])*)\s*(鍏億涓囧厓|浜垮厓)")
+    sanitized = generic_pattern.sub(
+        lambda match: match.group(0)
+        if match.group(0).replace(" ", "") in confirmed_mentions
+        else f"閲戦鍘熷鏁板€间负{match.group(1)}锛屽崟浣嶆湭纭",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(\d(?:[\d.,])*)\s*(元|万元|亿元|鍏億涓囧厓|浜垮厓)",
+        lambda match: match.group(0)
+        if match.group(0).replace(" ", "") in confirmed_mentions
+        else f"金额原始数值为{match.group(1)}，单位未确认",
+        sanitized,
+    )
     return sanitized
 
 
@@ -430,3 +461,23 @@ def _coerce_string_list(value: Any) -> list[str]:
         if text:
             items.append(text)
     return items
+
+
+def _mentions_amount_units_safe(result: AIAnalysisResult) -> bool:
+    texts = [result.summary, *result.reasons, *result.risks, *result.follow_up_questions]
+    combined = " ".join(text for text in texts if text)
+    return bool(re.search(r"\d(?:[\d.,])*\s*(?:元|万元|亿元|鍏億涓囧厓|浜垮厓)", combined))
+
+
+def _detail_status_for_prompt(notice: Notice) -> str:
+    if not notice.detail_checked:
+        return "未检查"
+    if not notice.detail_available:
+        return "不可访问"
+    return "已检查"
+
+
+def _yes_no_unknown(value: bool, checked: bool) -> str:
+    if not checked:
+        return "未确认"
+    return "有" if value else "无"

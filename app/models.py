@@ -28,6 +28,15 @@ class RawNoticeDetail:
 
 
 @dataclass
+class AttachmentInfo:
+    title: str
+    url: str
+    file_type: str = "UNKNOWN"
+    category: str = "unknown"
+    source: str = "unknown"
+
+
+@dataclass
 class Notice:
     source: str
     source_subtype: str
@@ -63,6 +72,16 @@ class Notice:
     raw_api_url: str = ""
     has_attachment: bool = False
     attachment_count: int = 0
+    detail_checked: bool = False
+    detail_available: bool = False
+    attachments_found: int = 0
+    attachments: list[AttachmentInfo] = field(default_factory=list)
+    has_likely_bidding_file: bool = False
+    has_likely_procurement_file: bool = False
+    has_likely_correction_file: bool = False
+    has_likely_bill_file: bool = False
+    needs_attachment_review: bool = False
+    detail_risk_note: str | None = None
     fetched_at: str = ""
     hit_keywords: list[str] = field(default_factory=list)
     lead_tier: str = ""

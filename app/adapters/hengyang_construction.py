@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..amount_utils import RAW_TEXT_SOURCE, parse_amount_context
+from ..attachment_utils import apply_attachment_result, discover_attachments
 from ..dedupe import build_dedupe_key
 from ..html_extract import html_to_text
 from ..models import Notice
@@ -49,11 +50,17 @@ class HengyangConstructionAdapter(BaseAdapter):
             return None
 
         origin = base_origin(self.url)
+        employee_url = build_transaction_detail_url(
+            origin=origin,
+            tender_project_type=(item.get("tenderProjectType") or "CONSTRUCTION"),
+            section_id=section_id,
+        )
+        raw_api_url = f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
         project_payload = self.fetcher.get_json(
             f"{origin}/tradeApi/constructionTender/getBySectionId?sectionId={section_id}"
         ) or {}
         notice_payload = self.fetcher.get_json(
-            f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}"
+            raw_api_url
         ) or {}
         attachment_payload = self.fetcher.get_json(
             f"{origin}/tradeApi/attach/proxy/getFileListBySectionId?sectionId={section_id}"
@@ -61,33 +68,36 @@ class HengyangConstructionAdapter(BaseAdapter):
 
         detail = project_payload.get("data") or {}
         notice_list = (notice_payload.get("data") or {}).get("noticeList") or []
-        if not detail or not notice_list:
-            return None
+        detail_available = bool(detail and notice_list)
+        if not detail_available:
+            return {
+                "detail_checked": True,
+                "detail_available": False,
+                "attachments": attachment_payload.get("data") or [],
+                "raw_api_url": raw_api_url,
+                "employee_url": employee_url,
+                "detail_risk_note": "详情页不可访问或解析失败",
+            }
 
         return {
+            "detail_checked": True,
+            "detail_available": True,
             "detail": detail,
             "notice_list": notice_list,
             "attachments": attachment_payload.get("data") or [],
-            "raw_api_url": f"{origin}/tradeApi/constructionNotice/getBySectionId?sectionId={section_id}",
-            "employee_url": build_transaction_detail_url(
-                origin=origin,
-                tender_project_type=(item.get("tenderProjectType") or "CONSTRUCTION"),
-                section_id=section_id,
-            ),
+            "raw_api_url": raw_api_url,
+            "employee_url": employee_url,
         }
 
     def normalize(self, item: dict[str, Any], detail: dict[str, Any] | None = None) -> Notice:
-        if not detail:
-            raise ValueError("construction detail is required")
-
         section_id = (item.get("bidSectionId") or "").strip()
-        payload = detail.get("detail") or {}
+        payload = (detail or {}).get("detail") or {}
         tender = payload.get("constructionTender") or {}
         project = payload.get("constructionProject") or {}
         section_list = payload.get("constructionSectionList") or []
         section = section_list[0] if section_list else {}
-        attachments = detail.get("attachments") or []
-        notice_info = (detail.get("notice") or ((detail.get("notice_list") or [{}])[0])) or {}
+        attachments = (detail or {}).get("attachments") or []
+        notice_info = ((detail or {}).get("notice") or (((detail or {}).get("notice_list") or [{}])[0])) or {}
         notice_html = notice_info.get("noticeContent") or ""
         notice_text = html_to_text(notice_html)
         content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
@@ -134,12 +144,21 @@ class HengyangConstructionAdapter(BaseAdapter):
             content_summary=content_summary,
             qualification_summary=qualification_summary,
             accepts_consortium=consortium,
-            original_url=str(detail.get("employee_url") or ""),
-            employee_readable_url=str(detail.get("employee_url") or ""),
-            raw_api_url=str(detail.get("raw_api_url") or ""),
-            has_attachment=bool(attachments),
-            attachment_count=len(attachments),
+            original_url=str((detail or {}).get("employee_url") or ""),
+            employee_readable_url=str((detail or {}).get("employee_url") or ""),
+            raw_api_url=str((detail or {}).get("raw_api_url") or ""),
             fetched_at=self.now_string(),
+        )
+        apply_attachment_result(
+            notice,
+            discover_attachments(
+                detail_checked=bool((detail or {}).get("detail_checked")),
+                detail_available=bool((detail or {}).get("detail_available")),
+                detail_html=notice_html,
+                base_url=notice.employee_readable_url or notice.raw_api_url or self.url,
+                structured_records=attachments,
+                detail_risk_note=(detail or {}).get("detail_risk_note"),
+            ),
         )
         notice.dedupe_key = build_dedupe_key(notice)
         return notice
@@ -149,6 +168,7 @@ class HengyangConstructionAdapter(BaseAdapter):
         detail_success = 0
         skipped = 0
         latest_site_publish_time = ""
+        inaccessible_count = 0
 
         for item in self.fetch_list():
             if not (item.get("bidSectionId") or "").strip():
@@ -160,10 +180,14 @@ class HengyangConstructionAdapter(BaseAdapter):
                 skipped += 1
                 continue
 
-            for notice_info in detail.get("notice_list") or []:
+            notice_list = detail.get("notice_list") or [None]
+            for notice_info in notice_list:
                 notice = self.normalize(item, {**detail, "notice": notice_info})
                 notices.append(notice)
-                detail_success += 1
+                if notice.detail_available:
+                    detail_success += 1
+                else:
+                    inaccessible_count += 1
                 latest_site_publish_time = max(latest_site_publish_time, notice.publish_time or "")
 
         list_stats = getattr(self, "_list_stats", {})
@@ -178,6 +202,7 @@ class HengyangConstructionAdapter(BaseAdapter):
             "error_count": list_stats.get("error_count", 0),
             "fetch_failed": 1 if list_stats.get("successful_pages", 0) == 0 else 0,
             "latest_site_publish_time": latest_site_publish_time,
+            "detail_unavailable_count": inaccessible_count,
         }
         return notices
 

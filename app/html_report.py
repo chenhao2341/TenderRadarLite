@@ -11,6 +11,7 @@ import webbrowser
 
 from .ai_analysis import AIAnalysisResult, MISSING_TEXT, UNIT_UNCONFIRMED_TEXT
 from .amount_utils import build_amount_context_from_notice, format_amount_with_context
+from .attachment_utils import ATTACHMENT_REVIEW_HINT, attachment_category_label
 from .models import Notice
 
 
@@ -867,6 +868,7 @@ def _render_footer_note() -> str:
 
 def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_result: AIAnalysisResult | None = None) -> str:
     rep = item.representative
+    attachment_panel = _render_attachment_panel(rep)
     notice_types = "".join(f'<span class="chip notice-type">{_escape(label)}</span>' for label in item.notice_labels)
     keywords = _render_chip_row(item.keyword_labels, empty_label="无")
     positive = _render_chip_row(item.positive_signals, empty_label="无")
@@ -920,6 +922,7 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
         </details>
         {_render_qualification_panel(item, compact=compact)}
       </div>
+      {attachment_panel}
       {_render_ai_panel(ai_result)}
       <div class="project-actions">
         {_render_link_button(rep)}
@@ -1003,6 +1006,43 @@ def _render_qualification_panel(item: ProjectReportItem, *, compact: bool) -> st
       <h5>资质要求摘要</h5>
       <p>{source}<span class="summary-body">{_escape(preview_text)}</span></p>
       {details_block}
+    </section>
+    """
+
+
+def _render_attachment_panel(notice: Notice) -> str:
+    if not notice.detail_checked:
+        return ""
+    if not notice.detail_available:
+        return """
+        <section class="signal-card">
+          <strong>详情/附件</strong>
+          <p>已检查详情页：是</p>
+          <p>详情页不可访问或解析失败</p>
+          <p>建议：请人工打开原文链接复核。</p>
+        </section>
+        """
+
+    lines = [
+        "<p>已检查详情页：是</p>",
+        f"<p>发现附件：{notice.attachments_found} 个</p>",
+    ]
+    if notice.attachments:
+        lines.extend(
+            [
+                f"<p>- {_escape(item.title)}（{_escape(item.file_type)} / {_escape(attachment_category_label(item.category))}）</p>"
+                for item in notice.attachments[:5]
+            ]
+        )
+        lines.append(
+            f"<p>建议：请人工查看附件确认金额单位、资质要求、评分办法和投标截止时间。 附件复核提示：{_escape(ATTACHMENT_REVIEW_HINT)}</p>"
+        )
+    else:
+        lines.append("<p>建议：当前系统未发现附件，仍建议以原公告页面为准。</p>")
+    return f"""
+    <section class="signal-card">
+      <strong>详情/附件</strong>
+      {"".join(lines)}
     </section>
     """
 

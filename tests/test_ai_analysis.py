@@ -19,6 +19,7 @@ from app.ai_analysis import (
     build_notice_analysis_prompt,
     has_explicit_amount_unit,
 )
+from app.models import AttachmentInfo
 from app.amount_utils import RAW_TEXT_SOURCE, amount_unit_source_label, parse_amount_context
 from app.html_report import build_html_report
 from app.models import Notice
@@ -256,6 +257,41 @@ class AIAnalysisTests(unittest.TestCase):
         self.assertNotIn("raw_payload", prompt)
         self.assertNotIn("FEISHU_APP_SECRET", prompt)
 
+    def test_prompt_includes_attachment_discovery_fields_and_guardrails(self) -> None:
+        notice = self._notice(suffix="attachment-prompt")
+        notice.detail_checked = True
+        notice.detail_available = True
+        notice.attachments_found = 2
+        notice.attachments = [
+            AttachmentInfo(title="招标文件.pdf", url="https://example.com/a.pdf", file_type="PDF", category="bidding_file", source="detail_page"),
+            AttachmentInfo(title="工程量清单.xlsx", url="https://example.com/b.xlsx", file_type="XLSX", category="bill_file", source="detail_page"),
+        ]
+        notice.has_likely_bidding_file = True
+        notice.has_likely_bill_file = True
+        notice.needs_attachment_review = True
+
+        prompt = build_notice_analysis_prompt(notice, profile_name="design_consulting")
+
+        self.assertIn('"detail_page_status": "已检查"', prompt)
+        self.assertIn('"attachment_count": 2', prompt)
+        self.assertIn('"has_likely_bidding_file": "有"', prompt)
+        self.assertIn('"has_likely_bill_file": "有"', prompt)
+        self.assertIn("招标文件.pdf", prompt)
+        self.assertIn("工程量清单.xlsx", prompt)
+        self.assertIn("不得声称已阅读附件全文", prompt)
+        self.assertIn("不得根据附件标题编造附件内容", prompt)
+
+    def test_prompt_marks_unavailable_detail_for_manual_review(self) -> None:
+        notice = self._notice(suffix="detail-unavailable")
+        notice.detail_checked = True
+        notice.detail_available = False
+        notice.detail_risk_note = "详情页不可访问或解析失败"
+
+        prompt = build_notice_analysis_prompt(notice, profile_name="design_consulting")
+
+        self.assertIn('"detail_page_status": "不可访问"', prompt)
+        self.assertIn("详情页不可访问或解析失败", prompt)
+
     def test_json_response_parses_into_structured_result(self) -> None:
         config = AIAnalysisConfig(enabled=True, api_key="key")
         client = _FakeClient(
@@ -315,6 +351,24 @@ class AIAnalysisTests(unittest.TestCase):
         self.assertIn("金额原始数值为5631.436489，单位未确认", result.summary)
         self.assertIn("金额原始数值为6351.45，单位未确认", result.reasons[0])
         self.assertIn("金额原始数值为5631.436489，单位未确认", result.follow_up_questions[0])
+
+    def test_unconfirmed_amount_units_are_sanitized_even_when_model_uses_unseen_numeric_unit_pairs(self) -> None:
+        config = AIAnalysisConfig(enabled=True, api_key="key")
+        client = _FakeClient(
+            response=(
+                '{"opportunity_score":70,"recommendation":"watch",'
+                '"summary":"项目整体预算较高，5631.436489万元值得关注。",'
+                '"reasons":["勘察设计费23854.56元需要复核。"],'
+                '"risks":[],"follow_up_questions":[]}'
+            )
+        )
+
+        result = analyze_notice(self._notice(suffix="generic-sanitize"), config, profile_name="design_consulting", client=client)
+
+        self.assertNotIn("5631.436489万元", result.summary)
+        self.assertNotIn("23854.56元", result.reasons[0])
+        self.assertIn("金额原始数值为5631.436489，单位未确认", result.summary)
+        self.assertIn("金额原始数值为23854.56，单位未确认", result.reasons[0])
 
     def test_network_error_does_not_break_flow(self) -> None:
         config = AIAnalysisConfig(enabled=True, api_key="key")
