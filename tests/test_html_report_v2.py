@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from app.html_report import write_html_report
+from app.company_profile import CompanyProfile
+from app.html_report import _company_zone_for_notice, write_html_report
 from app.models import Notice
 
 
@@ -300,6 +301,138 @@ class HtmlReportV2Tests(unittest.TestCase):
 
         self.assertNotIn('<details class="qualification-details">', html)
         self.assertNotIn("展开完整资质要求", html)
+
+
+    def test_company_profile_report_adds_four_zone_business_view(self) -> None:
+        high = self._notice(
+            project_name="Priority Design Project",
+            suffix="priority",
+            lead_tier="DIRECT",
+            section_id="section-priority",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        high.opportunity_stage = "new_opportunity"
+        high.company_match_score = 86
+        high.company_match_level = "high"
+        high.company_match_reasons = ["命中规划设计", "地区匹配"]
+
+        review = self._notice(
+            project_name="Review Clarification Project",
+            suffix="review",
+            lead_tier="WATCHLIST",
+            section_id="section-review",
+            notice_type="GENGZHENG_NOTICE",
+            publish_time="2026-06-16 09:00:00",
+        )
+        review.opportunity_stage = "correction_or_clarification"
+        review.company_match_score = 62
+        review.company_match_level = "medium"
+        review.company_match_reasons = ["命中咨询服务"]
+        review.manual_review_items = ["更正/澄清公告不是全新机会"]
+
+        low = self._notice(
+            project_name="Pipe Procurement Project",
+            suffix="low",
+            lead_tier="EXCLUDE",
+            section_id="section-low",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-15 09:00:00",
+        )
+        low.opportunity_stage = "mismatch_procurement"
+        low.company_match_score = 18
+        low.company_match_level = "mismatch"
+        low.company_mismatch_reasons = ["命中设备采购"]
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(
+                report_path,
+                [high, review, low],
+                source_count=1,
+                generated_at="2026-06-15 12:00:00",
+                company_profile=CompanyProfile(company_name="测试设计咨询公司"),
+            )
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("企业商机视图", html)
+        self.assertIn("今日优先跟进", html)
+        self.assertIn("建议人工复核", html)
+        self.assertIn("项目动态", html)
+        self.assertIn("低优先级或不匹配", html)
+        self.assertIn("新机会", html)
+        self.assertIn("企业匹配分", html)
+        self.assertIn("Priority Design Project", html)
+        self.assertIn("Pipe Procurement Project", html)
+
+    def test_default_report_does_not_force_company_business_view(self) -> None:
+        notice = self._notice(
+            project_name="Public Mode Project",
+            suffix="public-mode",
+            lead_tier="DIRECT",
+            section_id="section-public-mode",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.company_match_score = 90
+        notice.company_match_level = "high"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertNotIn("企业商机视图", html)
+        self.assertNotIn("今日优先跟进", html)
+        self.assertIn("DIRECT", html)
+
+
+class CompanyBusinessZoneTests(unittest.TestCase):
+    def _notice(self) -> Notice:
+        return Notice(
+            source="source",
+            source_subtype="construction",
+            dedupe_key="source|zone",
+            section_id="section-zone",
+            project_name="Zone Project",
+            notice_id="notice-zone",
+            notice_title="Zone Project",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+            bid_open_or_response_deadline="2026-06-20 09:00:00",
+            lead_tier="DIRECT",
+        )
+
+    def test_company_today_zone_requires_strong_match_signal(self) -> None:
+        notice = self._notice()
+        notice.opportunity_stage = "new_opportunity"
+        notice.company_match_score = 82
+        notice.company_match_level = "high"
+        notice.company_match_reasons = [
+            "\u547d\u4e2d\u8bbe\u8ba1\u54a8\u8be2\u76f8\u5173\u8bcd\uff1a\u8bbe\u8ba1\u3001\u54a8\u8be2\u3001\u89c4\u5212",
+            "\u4ec5\u4e3a\u5f31\u5339\u914d\u8bcd\uff0c\u9700\u7ed3\u5408\u539f\u516c\u544a\u786e\u8ba4",
+        ]
+
+        self.assertEqual(_company_zone_for_notice(notice), "review")
+
+    def test_company_today_zone_requires_no_obvious_exclusion_signal(self) -> None:
+        notice = self._notice()
+        notice.opportunity_stage = "new_opportunity"
+        notice.company_match_score = 80
+        notice.company_match_level = "high"
+        notice.company_match_reasons = ["\u547d\u4e2d\u5f3a\u5339\u914d\u8bcd\uff1a\u5de5\u7a0b\u54a8\u8be2"]
+        notice.company_mismatch_reasons = ["\u547d\u4e2d\u6392\u9664\u7c7b\u578b\uff1a\u8bbe\u5907\u91c7\u8d2d"]
+
+        self.assertEqual(_company_zone_for_notice(notice), "review")
+
+    def test_company_today_zone_accepts_new_high_strong_signal_without_exclusion(self) -> None:
+        notice = self._notice()
+        notice.opportunity_stage = "new_opportunity"
+        notice.company_match_score = 86
+        notice.company_match_level = "high"
+        notice.company_match_reasons = ["\u547d\u4e2d\u5f3a\u5339\u914d\u8bcd\uff1a\u52d8\u5bdf\u8bbe\u8ba1\u3001\u5de5\u7a0b\u54a8\u8be2"]
+
+        self.assertEqual(_company_zone_for_notice(notice), "today")
 
 
 if __name__ == "__main__":

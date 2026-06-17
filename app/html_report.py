@@ -12,7 +12,9 @@ import webbrowser
 from .ai_analysis import AIAnalysisResult, MISSING_TEXT, UNIT_UNCONFIRMED_TEXT
 from .amount_utils import build_amount_context_from_notice, format_amount_with_context
 from .attachment_utils import ATTACHMENT_REVIEW_HINT, attachment_category_label
+from .company_profile import CompanyProfile
 from .models import Notice
+from .opportunity_stage import opportunity_stage_label
 
 
 REPORT_TITLE = "TenderRadarLite 本地招投标线索报告"
@@ -75,6 +77,7 @@ def write_html_report(
     source_count: int = 0,
     generated_at: str | None = None,
     profile_name: str | None = None,
+    company_profile: CompanyProfile | None = None,
     ai_results: dict[str, AIAnalysisResult] | None = None,
     ai_status_message: str = "",
 ) -> Path:
@@ -86,6 +89,7 @@ def write_html_report(
         source_count=source_count,
         generated_at=generated_at,
         profile_name=profile_name,
+        company_profile=company_profile,
         ai_results=ai_results,
         ai_status_message=ai_status_message,
     )
@@ -99,6 +103,7 @@ def build_html_report(
     source_count: int = 0,
     generated_at: str | None = None,
     profile_name: str | None = None,
+    company_profile: CompanyProfile | None = None,
     ai_results: dict[str, AIAnalysisResult] | None = None,
     ai_status_message: str = "",
 ) -> str:
@@ -126,6 +131,7 @@ def build_html_report(
     else:
         body_sections = "".join(
             [
+                _render_company_business_view(projects, company_profile) if company_profile is not None else "",
                 _render_primary_section("DIRECT", grouped["DIRECT"], ai_results=ai_results),
                 _render_primary_section("WATCHLIST", grouped["WATCHLIST"], ai_results=ai_results),
                 _render_exclude_section(grouped["EXCLUDE"], ai_results=ai_results),
@@ -291,6 +297,36 @@ def build_html_report(
       color: #7b520b;
       font-size: 14px;
       line-height: 1.7;
+    }}
+    .company-view {{
+      display: grid;
+      gap: 16px;
+      margin-bottom: 22px;
+    }}
+    .company-zone-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px 22px 22px;
+    }}
+    .company-card {{
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-soft);
+    }}
+    .company-card h4 {{
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.35;
+    }}
+    .company-meta {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }}
     .report-flow {{
       display: grid;
@@ -668,6 +704,7 @@ def build_html_report(
     @media (max-width: 1180px) {{
       .hero-grid,
       .stats,
+      .company-zone-grid,
       .fact-grid,
       .signal-grid,
       .summary-grid {{
@@ -811,6 +848,168 @@ def _render_status_banner(message: str) -> str:
     return f'<section class="status-banner">{_escape(message)}</section>'
 
 
+def _render_company_business_view(items: list[ProjectReportItem], company_profile: CompanyProfile | None) -> str:
+    if company_profile is None:
+        return ""
+    zones = {
+        "today": [],
+        "review": [],
+        "dynamic": [],
+        "low": [],
+    }
+    for item in items:
+        zone = _company_zone_for_notice(item.representative)
+        zones[zone].append(item)
+
+    zone_defs = [
+        ("today", "今日优先跟进", "高匹配 + 新机会 + 截止有效"),
+        ("review", "建议人工复核", "中高匹配但金额、资质、附件或澄清需确认"),
+        ("dynamic", "项目动态", "更正、澄清、答疑、流标、重招"),
+        ("low", "低优先级或不匹配", "低分、不匹配、材料/设备采购、中标结果等"),
+    ]
+    blocks = []
+    for key, title, note in zone_defs:
+        zone_items = zones[key]
+        cards = (
+            "".join(_render_company_business_card(item) for item in zone_items)
+            if zone_items
+            else '<article class="company-card"><p class="section-note">本区暂无项目。</p></article>'
+        )
+        blocks.append(
+            f"""
+            <section class="section">
+              <div class="section-header">
+                <div class="section-heading">
+                  <h3 class="section-title">{_escape(title)}</h3>
+                  <p class="section-note">{_escape(note)}</p>
+                </div>
+                <div class="section-count">{len(zone_items)} 个项目</div>
+              </div>
+              <div class="company-zone-grid">{cards}</div>
+            </section>
+            """
+        )
+    profile_name = company_profile.company_name or "未命名企业"
+    return f"""
+    <section class="company-view">
+      <section class="section">
+        <div class="section-header">
+          <div class="section-heading">
+            <h3 class="section-title">企业商机视图</h3>
+            <p class="section-note">{_escape(profile_name)} · 基于企业画像、商机阶段和规则评分重排，不替代人工复核。</p>
+          </div>
+          <div class="section-count">{len(items)} 个项目</div>
+        </div>
+      </section>
+      {"".join(blocks)}
+    </section>
+    """
+
+
+def _company_zone_for_notice(notice: Notice) -> str:
+    stage = notice.opportunity_stage or "unknown"
+    level = notice.company_match_level or "unknown"
+    score = notice.company_match_score if notice.company_match_score is not None else 0
+    if stage in {"correction_or_clarification", "rebid_signal", "project_update"}:
+        return "dynamic"
+    if stage in {"award_result", "mismatch_procurement"} or level == "mismatch" or score < 35:
+        return "low"
+    if (
+        level == "high"
+        and stage == "new_opportunity"
+        and _notice_has_company_high_signal(notice)
+        and not _notice_has_company_exclusion_signal(notice)
+        and not _deadline_expired_for_display(notice)
+    ):
+        return "today"
+    if level in {"high", "medium"}:
+        return "review"
+    return "low"
+
+
+def _notice_has_company_high_signal(notice: Notice) -> bool:
+    return any(
+        "命中强匹配词" in reason or "命中明确目标项目类型" in reason
+        for reason in notice.company_match_reasons
+    )
+
+
+def _notice_has_company_exclusion_signal(notice: Notice) -> bool:
+    return any(
+        "命中排除类型" in reason or "偏施工/采购" in reason
+        for reason in notice.company_mismatch_reasons
+    )
+
+
+def _render_company_business_card(item: ProjectReportItem) -> str:
+    rep = item.representative
+    score = str(rep.company_match_score) if rep.company_match_score is not None else MISSING_TEXT
+    reasons = _render_limited_text(rep.company_match_reasons, "暂无")
+    mismatch = _render_limited_text(rep.company_mismatch_reasons, "暂无")
+    review = _render_limited_text(rep.manual_review_items, "暂无")
+    attachment_status = _attachment_status_label(rep)
+    amount_status = _amount_status_label(rep)
+    ai_hint = "规则评分为主；AI 仅作辅助研判" if rep.company_match_score is not None else "未启用企业评分"
+    return f"""
+    <article class="company-card">
+      <h4>{_escape(item.project_name)}</h4>
+      <div class="company-meta">
+        <span class="chip">{_escape(opportunity_stage_label(rep.opportunity_stage))}</span>
+        <span class="chip">企业匹配分：{_escape(score)}</span>
+        <span class="chip">匹配等级：{_escape(rep.company_match_level or "unknown")}</span>
+      </div>
+      <p><strong>匹配理由：</strong>{reasons}</p>
+      <p><strong>不匹配理由：</strong>{mismatch}</p>
+      <p><strong>人工复核项：</strong>{review}</p>
+      <p><strong>附件状态：</strong>{_escape(attachment_status)} · <strong>金额单位状态：</strong>{_escape(amount_status)}</p>
+      <p><strong>AI 建议：</strong>{_escape(ai_hint)}</p>
+      {_render_link_button(rep)}
+    </article>
+    """
+
+
+def _render_limited_text(values: list[str], empty_label: str) -> str:
+    items = values[:5] if values else [empty_label]
+    return _escape("；".join(items))
+
+
+def _attachment_status_label(notice: Notice) -> str:
+    if not notice.detail_checked:
+        return "未检查详情页"
+    if not notice.detail_available:
+        return "详情页不可访问或解析失败"
+    if notice.attachments_found:
+        return f"发现附件 {notice.attachments_found} 个，需人工复核"
+    return "未发现附件"
+
+
+def _amount_status_label(notice: Notice) -> str:
+    budget = build_amount_context_from_notice(
+        notice.budget_amount,
+        unit=notice.budget_amount_unit,
+        unit_source=notice.budget_amount_unit_source,
+        raw_text_snippet=notice.budget_amount_raw_text_snippet,
+    )
+    ceiling = build_amount_context_from_notice(
+        notice.ceiling_price,
+        unit=notice.ceiling_price_unit,
+        unit_source=notice.ceiling_price_unit_source,
+        raw_text_snippet=notice.ceiling_price_raw_text_snippet,
+    )
+    if any(context.raw_value and not context.unit for context in [budget, ceiling]):
+        return "金额单位未确认"
+    if any(context.raw_value and context.unit for context in [budget, ceiling]):
+        return "金额单位已提取"
+    return "未提取金额"
+
+
+def _deadline_expired_for_display(notice: Notice) -> bool:
+    deadline = _sortable_datetime(notice.bid_open_or_response_deadline or notice.file_get_deadline)
+    if not deadline:
+        return False
+    return deadline < int(datetime.now().timestamp())
+
+
 def _render_primary_section(tier: str, items: list[ProjectReportItem], *, ai_results: dict[str, AIAnalysisResult]) -> str:
     section_body = (
         "".join(_render_project_card(item, ai_result=ai_results.get(item.aggregation_key)) for item in items)
@@ -887,6 +1086,7 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
         <span class="tier-badge {_escape_attr(item.project_tier.lower())}"><span class="tier-code">{_escape(item.project_tier)}</span><span class="tier-text">{_escape(TIER_LABELS[item.project_tier])}</span></span>
       </div>
       <div class="fact-grid">
+        {_fact("商机阶段", opportunity_stage_label(rep.opportunity_stage))}
         {_fact("地区", rep.region or "未提取到")}
         {_fact("关联公告类型", "、".join(item.notice_labels) or "未提取到")}
         {_fact("招标人或采购单位", rep.purchaser_or_tenderer or "未提取到")}

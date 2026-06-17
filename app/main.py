@@ -52,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROFILE_ID,
         help=f"Industry profile to use for local classification (default: {DEFAULT_PROFILE_ID})",
     )
+    parser.add_argument(
+        "--company-profile",
+        help="Optional company YAML profile for enterprise match scoring in local HTML/AI mode",
+    )
     parser.add_argument("--pilot-notice-ids-file", help="Run notice_id whitelist preview or execute flow")
     parser.add_argument("--dry-run", action="store_true", help="Preview whitelist notices without side effects")
     parser.add_argument("--execute", action="store_true", help="Execute whitelist notices with real side effects")
@@ -200,11 +204,13 @@ def main(argv: list[str] | None = None) -> int:
                 "html_report": True,
                 "profile_id": args.profile,
             }
+            if args.company_profile:
+                run_kwargs["company_profile_path"] = args.company_profile
             if args.ai_analysis or args.ai_analysis_limit is not None:
                 run_kwargs["enable_ai_analysis"] = args.ai_analysis
                 run_kwargs["ai_analysis_limit"] = args.ai_analysis_limit
             results = run_once(**run_kwargs)
-        except ProfileNotFoundError as exc:
+        except (ProfileNotFoundError, FileNotFoundError, ValueError) as exc:
             print(str(exc))
             return 2
         _print_run_results(results)

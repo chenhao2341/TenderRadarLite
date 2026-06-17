@@ -14,6 +14,8 @@ from .ai_analysis import (
     normalize_ai_analysis_limit,
 )
 from .config import DATA_DIR, REPORT_DIR, ensure_runtime_dirs, load_keywords, load_pilot_notice_ids, load_sources
+from .company_matcher import apply_company_match
+from .company_profile import load_company_profile
 from .dedupe import build_dedupe_key
 from .feishu import FeishuClient
 from .fetcher import Fetcher
@@ -21,6 +23,7 @@ from .html_report import aggregate_notices, open_html_report, write_html_report
 from .keywords import build_keyword_text, match_keywords
 from .logging_utils import setup_logging
 from .models import Notice
+from .opportunity_stage import classify_opportunity_stage
 from .profiles import DEFAULT_PROFILE_ID, load_profile
 from .preview_report import classify_notice, write_structured_preview_report
 from .storage import NoticeMatchStatus, Storage
@@ -145,11 +148,13 @@ def run_once(
     profile_id: str = DEFAULT_PROFILE_ID,
     enable_ai_analysis: bool = False,
     ai_analysis_limit: int | None = None,
+    company_profile_path: str | Path | None = None,
 ) -> list[RunSummary]:
     ensure_runtime_dirs()
     logger = setup_logging()
     keywords = load_keywords()
     profile = load_profile(profile_id)
+    company_profile = load_company_profile(company_profile_path) if company_profile_path else None
     storage = Storage(DATA_DIR / "bids.db")
     feishu = None
     if enable_feishu:
@@ -187,6 +192,9 @@ def run_once(
                 notice.lead_reason = str(classification["lead_reason"])
                 notice.matched_positive_signals = list(classification["matched_positive_signals"])
                 notice.matched_negative_signals = list(classification["matched_negative_signals"])
+                notice.opportunity_stage = classify_opportunity_stage(notice)
+                if company_profile is not None:
+                    apply_company_match(notice, company_profile)
                 if notice.lead_tier == "DIRECT":
                     direct_count += 1
                 elif notice.lead_tier == "WATCHLIST":
@@ -335,6 +343,7 @@ def run_once(
                 [item.representative for item in candidate_projects],
                 ai_config,
                 profile_name=str(profile.get("name", profile_id)),
+                company_profile=company_profile,
             )
             for item, result in zip(candidate_projects, ai_results):
                 ai_results_by_project[item.aggregation_key] = result
@@ -347,6 +356,7 @@ def run_once(
             html_notices,
             source_count=len(enabled_sources),
             profile_name=str(profile.get("name", profile_id)),
+            company_profile=company_profile,
             ai_results=ai_results_by_project,
             ai_status_message=ai_status_message,
         )

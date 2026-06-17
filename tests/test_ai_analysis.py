@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ from app.ai_analysis import (
     build_notice_analysis_prompt,
     has_explicit_amount_unit,
 )
+from app.company_profile import CompanyProfile
 from app.models import AttachmentInfo
 from app.amount_utils import RAW_TEXT_SOURCE, amount_unit_source_label, parse_amount_context
 from app.html_report import build_html_report
@@ -280,6 +282,44 @@ class AIAnalysisTests(unittest.TestCase):
         self.assertIn("工程量清单.xlsx", prompt)
         self.assertIn("不得声称已阅读附件全文", prompt)
         self.assertIn("不得根据附件标题编造附件内容", prompt)
+
+    def test_prompt_includes_company_profile_stage_and_match_context(self) -> None:
+        notice = self._notice(suffix="company-context")
+        notice.opportunity_stage = "correction_or_clarification"
+        notice.company_match_score = 64
+        notice.company_match_level = "medium"
+        notice.company_match_reasons = ["命中设计咨询"]
+        notice.company_mismatch_reasons = ["更正公告不是全新机会"]
+        notice.manual_review_items = ["金额单位未确认"]
+
+        prompt = build_notice_analysis_prompt(
+            notice,
+            profile_name="design",
+            company_profile=CompanyProfile(company_name="测试设计咨询公司", business_scope=["工程咨询"]),
+        )
+        payload = json.loads(prompt)
+
+        notice_fields = payload["notice"]
+        self.assertEqual(notice_fields["company_profile_summary"]["company_name"], "测试设计咨询公司")
+        self.assertEqual(notice_fields["opportunity_stage"], "correction_or_clarification")
+        self.assertEqual(notice_fields["company_match_score"], 64)
+        self.assertEqual(notice_fields["company_match_level"], "medium")
+        self.assertEqual(notice_fields["company_match_reasons"], ["命中设计咨询"])
+        self.assertEqual(notice_fields["company_mismatch_reasons"], ["更正公告不是全新机会"])
+        self.assertEqual(notice_fields["manual_review_items"], ["金额单位未确认"])
+
+    def test_prompt_without_company_profile_omits_enterprise_scoring_context(self) -> None:
+        notice = self._notice(suffix="public-context")
+        notice.company_match_score = 88
+        notice.company_match_level = "high"
+
+        prompt = build_notice_analysis_prompt(notice, profile_name="design")
+        payload = json.loads(prompt)
+
+        notice_fields = payload["notice"]
+        self.assertNotIn("company_profile_summary", notice_fields)
+        self.assertNotIn("company_match_score", notice_fields)
+        self.assertNotIn("company_match_level", notice_fields)
 
     def test_prompt_marks_unavailable_detail_for_manual_review(self) -> None:
         notice = self._notice(suffix="detail-unavailable")

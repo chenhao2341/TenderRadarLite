@@ -110,3 +110,25 @@ tests/
 - Current adapters only inspect already-enabled Hengyang sources and do not expand source coverage.
 - The implementation does not download attachment bodies and does not parse PDF, Word, Excel, OCR, or RAG content.
 - Attachment title and coarse type are treated only as manual-review clues; final judgement must still use the original notice and original attachments.
+
+## Optional enterprise opportunity mode
+
+TenderRadarLite has two coexisting open-source routes:
+
+1. General public monitoring mode: the default mode for public tender monitoring, Source Catalog, unlisted-site onboarding guidance, industry profiles, local HTML, optional Feishu sync, AI notice triage, future Web console, and open-source documentation.
+2. Enterprise custom opportunity mode: an optional mode enabled by `--company-profile`, adding company profile loading, enterprise match scoring, and the enterprise opportunity view on top of the same notice pipeline.
+
+Shared foundation:
+
+- adapters
+- `Notice`
+- HTML report generation
+- attachment discovery
+- amount-unit guardrails
+- AI triage
+- tests
+- documentation
+
+Default behavior remains the public monitoring mode. `python run_mvp.py --local-html --profile design_consulting` keeps the general report path and does not require a company profile. `python run_mvp.py --local-html --profile design_consulting --company-profile profiles/company_sample.yaml` enables enterprise scoring and the enterprise opportunity view.
+
+The enterprise fields are runtime-only in this Alpha and are not persisted to SQLite. The enterprise view is not forced into the default report, and enterprise scoring does not replace `DIRECT / WATCHLIST / EXCLUDE`.

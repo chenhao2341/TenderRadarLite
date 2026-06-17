@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 from unittest import mock
+from contextlib import redirect_stdout
+from io import StringIO
 
 from app.main import build_parser, main
 from app.models import Notice
@@ -97,6 +99,13 @@ class ProfileCliTests(unittest.TestCase):
 
         self.assertEqual(args.profile, "design_consulting")
 
+    def test_parser_accepts_optional_company_profile_path(self) -> None:
+        parser = build_parser()
+
+        args = parser.parse_args(["--local-html", "--company-profile", "profiles/company_sample.yaml"])
+
+        self.assertEqual(args.company_profile, "profiles/company_sample.yaml")
+
     def test_local_html_passes_explicit_profile(self) -> None:
         with mock.patch("app.main.run_once", return_value=[]) as run_once_mock:
             exit_code = main(["--local-html", "--profile", "design_consulting"])
@@ -110,6 +119,15 @@ class ProfileCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         run_once_mock.assert_called_once_with(enable_feishu=False, html_report=True, profile_id="design_consulting")
+
+    def test_local_html_reports_company_profile_load_error(self) -> None:
+        output = StringIO()
+        with mock.patch("app.main.run_once", side_effect=FileNotFoundError("Company profile not found: missing.yaml")):
+            with redirect_stdout(output):
+                exit_code = main(["--local-html", "--company-profile", "missing.yaml"])
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("Company profile not found", output.getvalue())
 
 
 if __name__ == "__main__":

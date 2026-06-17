@@ -14,6 +14,7 @@ from .amount_utils import (
     build_amount_context_from_notice,
     has_explicit_amount_unit,
 )
+from .company_profile import CompanyProfile
 from .models import Notice
 
 
@@ -138,7 +139,12 @@ class OpenAICompatibleClient:
         return str((((payload.get("choices") or [{}])[0].get("message") or {}).get("content")) or "")
 
 
-def build_notice_analysis_prompt(notice: Notice, *, profile_name: str = "") -> str:
+def build_notice_analysis_prompt(
+    notice: Notice,
+    *,
+    profile_name: str = "",
+    company_profile: CompanyProfile | None = None,
+) -> str:
     normalized_profile = (profile_name or "").strip() or "unknown"
     fields = {
         "project_name": notice.project_name or MISSING_TEXT,
@@ -180,6 +186,18 @@ def build_notice_analysis_prompt(notice: Notice, *, profile_name: str = "") -> s
         "profile_id": normalized_profile,
         "profile_name": normalized_profile,
     }
+    if company_profile is not None:
+        fields.update(
+            {
+                "company_profile_summary": _company_profile_summary(company_profile),
+                "opportunity_stage": notice.opportunity_stage or "unknown",
+                "company_match_score": notice.company_match_score,
+                "company_match_level": notice.company_match_level or "unknown",
+                "company_match_reasons": notice.company_match_reasons or [],
+                "company_mismatch_reasons": notice.company_mismatch_reasons or [],
+                "manual_review_items": notice.manual_review_items or [],
+            }
+        )
     instructions = {
         "role": "中国大陆招投标与政府采购线索研判助手",
         "task": "基于结构化公告字段、当前 profile 和命中信号，判断该线索是否具备进一步人工跟进价值。",
@@ -241,6 +259,14 @@ def build_notice_analysis_prompt(notice: Notice, *, profile_name: str = "") -> s
             "follow_up_questions": ["简体中文追问1", "简体中文追问2"],
         },
     }
+    if company_profile is not None:
+        instructions["company_match_guardrails"] = [
+            "企业匹配分为规则评分结果，AI 不得替代或覆盖规则评分。",
+            "更正、澄清、答疑公告不得当作全新机会。",
+            "中标、成交、合同公告一般不作为投标机会。",
+            "不得声称已阅读附件全文。",
+            "不得输出中标概率。",
+        ]
     return json.dumps({"instructions": instructions, "notice": fields}, ensure_ascii=False, indent=2)
 
 
@@ -255,6 +281,7 @@ def analyze_notice(
     config: AIAnalysisConfig,
     *,
     profile_name: str = "",
+    company_profile: CompanyProfile | None = None,
     client: OpenAICompatibleClient | None = None,
 ) -> AIAnalysisResult:
     result = AIAnalysisResult(enabled=config.enabled, skipped=False, notice_key=notice.dedupe_key or notice.notice_id or notice.title)
@@ -272,7 +299,7 @@ def analyze_notice(
         return result
 
     active_client = client or OpenAICompatibleClient(config)
-    prompt = build_notice_analysis_prompt(notice, profile_name=profile_name)
+    prompt = build_notice_analysis_prompt(notice, profile_name=profile_name, company_profile=company_profile)
     try:
         raw_content = active_client.create_chat_completion(prompt)
     except Exception as exc:
@@ -289,12 +316,29 @@ def analyze_notices(
     config: AIAnalysisConfig,
     *,
     profile_name: str = "",
+    company_profile: CompanyProfile | None = None,
     client_factory: Callable[[AIAnalysisConfig], OpenAICompatibleClient] | None = None,
 ) -> list[AIAnalysisResult]:
     client = client_factory(config) if client_factory is not None and config.enabled and config.api_key else None
     eligible = [notice for notice in notices if (notice.lead_tier or "").upper() in ALLOWED_TIERS]
     limited = eligible[: max(config.max_items, 0)]
-    return [analyze_notice(notice, config, profile_name=profile_name, client=client) for notice in limited]
+    return [
+        analyze_notice(notice, config, profile_name=profile_name, company_profile=company_profile, client=client)
+        for notice in limited
+    ]
+
+
+def _company_profile_summary(profile: CompanyProfile | None) -> dict[str, Any]:
+    if profile is None:
+        return {}
+    return {
+        "company_name": profile.company_name,
+        "regions": profile.regions[:5],
+        "business_scope": profile.business_scope[:5],
+        "target_project_types": profile.target_project_types[:5],
+        "exclude_project_types": profile.exclude_project_types[:5],
+        "qualifications": profile.qualifications[:5],
+    }
 
 
 def _parse_analysis_response(result: AIAnalysisResult, raw_content: str) -> AIAnalysisResult:

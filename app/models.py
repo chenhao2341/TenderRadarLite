@@ -88,6 +88,12 @@ class Notice:
     lead_reason: str = ""
     matched_positive_signals: list[str] = field(default_factory=list)
     matched_negative_signals: list[str] = field(default_factory=list)
+    opportunity_stage: str = "unknown"
+    company_match_score: int | None = None
+    company_match_level: str = "unknown"
+    company_match_reasons: list[str] = field(default_factory=list)
+    company_mismatch_reasons: list[str] = field(default_factory=list)
+    manual_review_items: list[str] = field(default_factory=list)
     is_new: bool = False
     manual_judgement: str = "待确认"
     newness_label: str | None = None

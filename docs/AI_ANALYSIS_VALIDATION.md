@@ -54,6 +54,12 @@
 - Future Web controls should allow users to choose specific projects, sources, or industries for AI analysis.
 - This keeps API cost, runtime risk, and HTML report size under control.
 
+## Company profile boundary
+
+Enterprise match context is optional. Without `--company-profile`, AI prompt construction remains in general public monitoring mode and does not receive company profile summaries or enterprise match scores.
+
+With `--company-profile`, the prompt may receive company profile summary, `opportunity_stage`, `company_match_score`, `company_match_level`, match reasons, mismatch reasons, and manual-review items. These fields are rule-scoring context only: AI must not replace the rule score, must not output bid-winning probability, must not treat correction/clarification notices as new opportunities, and must not claim it has read attachment full text.
+
 ## Real API re-check
 
 - Pending after code/test verification in this turn.
