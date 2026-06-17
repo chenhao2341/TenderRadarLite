@@ -9,7 +9,8 @@ import re
 from typing import Iterable
 import webbrowser
 
-from .ai_analysis import AIAnalysisResult, MISSING_TEXT
+from .ai_analysis import AIAnalysisResult, MISSING_TEXT, UNIT_UNCONFIRMED_TEXT
+from .amount_utils import build_amount_context_from_notice, format_amount_with_context
 from .models import Notice
 
 
@@ -39,6 +40,11 @@ NOTICE_TYPE_LABELS = {
     "CHONGXIN_ZHAOBIAO_NOTICE": "重新招标公告",
 }
 TIER_PRIORITY = {"DIRECT": 0, "WATCHLIST": 1, "EXCLUDE": 2}
+AI_RECOMMENDATION_LABELS = {
+    "follow_up": "建议跟进",
+    "watch": "继续观察",
+    "skip": "建议跳过",
+}
 
 
 @dataclass
@@ -885,8 +891,8 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
         {_fact("代理机构", rep.agency or "未提取到")}
         {_fact("发布时间", _friendly_time(item.latest_publish_time))}
         {_fact("截止时间", _friendly_time(rep.bid_open_or_response_deadline or rep.file_get_deadline or "未提取到"))}
-        {_fact("预算金额", rep.budget_amount or "未提取到")}
-        {_fact("最高限价", rep.ceiling_price or "未提取到")}
+        {_fact("预算金额", _format_amount_display(rep, field_name="budget_amount"))}
+        {_fact("最高限价", _format_amount_display(rep, field_name="ceiling_price"))}
       </div>
       <div class="signal-grid">
         <div class="signal-card">
@@ -932,6 +938,29 @@ def _render_link_button(notice: Notice) -> str:
 
 def _fact(label: str, value: str) -> str:
     return f'<div class="fact"><strong>{_escape(label)}</strong><span>{_escape(value)}</span></div>'
+
+
+def _format_amount_display(notice: Notice, *, field_name: str) -> str:
+    if field_name == "budget_amount":
+        context = build_amount_context_from_notice(
+            notice.budget_amount,
+            unit=notice.budget_amount_unit,
+            unit_source=notice.budget_amount_unit_source,
+            raw_text_snippet=notice.budget_amount_raw_text_snippet,
+        )
+    else:
+        context = build_amount_context_from_notice(
+            notice.ceiling_price,
+            unit=notice.ceiling_price_unit,
+            unit_source=notice.ceiling_price_unit_source,
+            raw_text_snippet=notice.ceiling_price_raw_text_snippet,
+        )
+    return format_amount_with_context(
+        context.raw_value,
+        unit=context.unit,
+        missing_text=MISSING_TEXT,
+        unit_unconfirmed_text=UNIT_UNCONFIRMED_TEXT,
+    )
 
 
 def _render_chip_row(values: list[str], *, empty_label: str) -> str:
@@ -982,7 +1011,7 @@ def _render_ai_panel(ai_result: AIAnalysisResult | None) -> str:
     if ai_result is None or ai_result.skipped:
         return ""
     score_text = str(ai_result.opportunity_score) if ai_result.opportunity_score is not None else MISSING_TEXT
-    recommendation_text = ai_result.recommendation or MISSING_TEXT
+    recommendation_text = _recommendation_label(ai_result.recommendation)
     reasons_text = "；".join(ai_result.reasons) if ai_result.reasons else MISSING_TEXT
     risks_text = "；".join(ai_result.risks) if ai_result.risks else MISSING_TEXT
     follow_up_text = "；".join(ai_result.follow_up_questions) if ai_result.follow_up_questions else MISSING_TEXT
@@ -1000,6 +1029,13 @@ def _render_ai_panel(ai_result: AIAnalysisResult | None) -> str:
       <p><strong>建议追问：</strong>{_escape(follow_up_text)}</p>
     </section>
     """
+
+
+def _recommendation_label(value: str) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        return MISSING_TEXT
+    return AI_RECOMMENDATION_LABELS.get(normalized, normalized)
 
 
 def _aggregation_key(notice: Notice) -> str:

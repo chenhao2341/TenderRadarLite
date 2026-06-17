@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..amount_utils import RAW_TEXT_SOURCE, parse_amount_context
+from ..html_extract import html_to_text
 from ..models import Notice
 from .base import BaseAdapter
 from .hengyang_trade_utils import base_origin, summarize_notice_html
@@ -52,8 +54,18 @@ class HengyangProcurementAdapter(BaseAdapter):
         files = payload.get("GovernmentPurchaseFile") or []
         section = section_list[0] if section_list else {}
         ann = detail.get("announcement") or {}
-        content_summary, qualification_summary, deadline, consortium = summarize_notice_html(
-            ann.get("noticeContent") or ""
+        notice_html = ann.get("noticeContent") or ""
+        notice_text = html_to_text(notice_html)
+        content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
+        budget_context = parse_amount_context(
+            _stringify_number(project.get("programBudget") or section.get("sectionBudget")),
+            text_sources=[(RAW_TEXT_SOURCE, notice_text)],
+            field_hints=("预算", "项目预算", "采购预算"),
+        )
+        ceiling_context = parse_amount_context(
+            _stringify_number(section.get("controlPrice") or section.get("sectionBudget")),
+            text_sources=[(RAW_TEXT_SOURCE, notice_text)],
+            field_hints=("最高", "限价", "控制价"),
         )
 
         return Notice(
@@ -71,8 +83,14 @@ class HengyangProcurementAdapter(BaseAdapter):
             publish_time=(ann.get("noticeSendTime") or item.get("noticeSendTime") or "").strip(),
             file_get_deadline=deadline if "截止" in deadline else "",
             bid_open_or_response_deadline=deadline,
-            budget_amount=_stringify_number(project.get("programBudget") or section.get("sectionBudget")),
-            ceiling_price=_stringify_number(section.get("controlPrice") or section.get("sectionBudget")),
+            budget_amount=budget_context.raw_value,
+            ceiling_price=ceiling_context.raw_value,
+            budget_amount_unit=budget_context.unit or "",
+            budget_amount_unit_source=budget_context.unit_source,
+            budget_amount_raw_text_snippet=budget_context.raw_text_snippet,
+            ceiling_price_unit=ceiling_context.unit or "",
+            ceiling_price_unit_source=ceiling_context.unit_source,
+            ceiling_price_raw_text_snippet=ceiling_context.raw_text_snippet,
             procurement_method=(section.get("tenderType") or project.get("purchaserMode") or "").strip(),
             content_summary=content_summary,
             qualification_summary=qualification_summary,

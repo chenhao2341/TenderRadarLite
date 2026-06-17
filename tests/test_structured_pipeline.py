@@ -158,6 +158,8 @@ class AdapterBehaviorTests(unittest.TestCase):
                                 "noticeSendTime": "2026-06-11T10:00:00.000+08:00",
                                 "noticeContent": (
                                     "<p>Procurement project: Project One</p>"
+                                    "<p>采购预算：100万元</p>"
+                                    "<p>最高限价：90元</p>"
                                     "<p>Qualification: supplier qualification required</p>"
                                     "<p>Deadline: 2026-06-20 09:00:00</p>"
                                     "<p>Consortium supported: No</p>"
@@ -191,6 +193,10 @@ class AdapterBehaviorTests(unittest.TestCase):
         self.assertTrue(hasattr(notice, "qualification_summary"))
         self.assertIsInstance(notice.qualification_summary, str)
         self.assertTrue(notice.content_summary)
+        self.assertEqual(notice.budget_amount, "100")
+        self.assertEqual(notice.budget_amount_unit, "万元")
+        self.assertEqual(notice.ceiling_price, "90")
+        self.assertEqual(notice.ceiling_price_unit, "元")
         self.assertEqual(notice.original_url, ann_url)
         self.assertEqual(notice.raw_api_url, ann_url)
         self.assertTrue(notice.dedupe_key)
@@ -449,6 +455,8 @@ class AdapterBehaviorTests(unittest.TestCase):
                                 "noticeSendTime": "2026-06-11 10:00:00",
                                 "noticeContent": (
                                     "<p>Project overview: example construction</p>"
+                                    "<p>合同估算价100万元</p>"
+                                    "<p>最高投标限价90元</p>"
                                     "<p>Qualification: required</p>"
                                     "<p>Deadline: 2026-06-30 09:00:00</p>"
                                 ),
@@ -484,6 +492,10 @@ class AdapterBehaviorTests(unittest.TestCase):
         self.assertTrue(hasattr(notice, "qualification_summary"))
         self.assertIsInstance(notice.qualification_summary, str)
         self.assertTrue(notice.content_summary)
+        self.assertEqual(notice.budget_amount, "100")
+        self.assertEqual(notice.budget_amount_unit, "万元")
+        self.assertEqual(notice.ceiling_price, "90")
+        self.assertEqual(notice.ceiling_price_unit, "元")
         self.assertEqual(
             notice.employee_readable_url,
             "https://hengyang.hnsggzy.com/#/resources/transactionDetail/construction?bidSectionId=sec-1&t=GC",

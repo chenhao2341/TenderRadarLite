@@ -40,12 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ai-analysis",
         action="store_true",
-        help="Optionally generate AI-assisted explanations for DIRECT/WATCHLIST items in local HTML mode",
+        help="Optionally generate AI-assisted Chinese analysis for a small number of DIRECT/WATCHLIST items in local HTML mode",
     )
     parser.add_argument(
         "--ai-analysis-limit",
         type=int,
-        help="Maximum DIRECT/WATCHLIST items to analyze when --ai-analysis is enabled",
+        help="Maximum DIRECT/WATCHLIST items to analyze when --ai-analysis is enabled (default 5, hard cap 10)",
     )
     parser.add_argument(
         "--profile",

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..amount_utils import RAW_TEXT_SOURCE, parse_amount_context
 from ..dedupe import build_dedupe_key
+from ..html_extract import html_to_text
 from ..models import Notice
 from .base import BaseAdapter
 from .hengyang_trade_utils import (
@@ -86,8 +88,18 @@ class HengyangConstructionAdapter(BaseAdapter):
         section = section_list[0] if section_list else {}
         attachments = detail.get("attachments") or []
         notice_info = (detail.get("notice") or ((detail.get("notice_list") or [{}])[0])) or {}
-        content_summary, qualification_summary, deadline, consortium = summarize_notice_html(
-            notice_info.get("noticeContent") or ""
+        notice_html = notice_info.get("noticeContent") or ""
+        notice_text = html_to_text(notice_html)
+        content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
+        budget_context = parse_amount_context(
+            _stringify_number(section.get("contractReckonPrice")),
+            text_sources=[(RAW_TEXT_SOURCE, notice_text)],
+            field_hints=("预算", "估算", "投资", "合同估算价"),
+        )
+        ceiling_context = parse_amount_context(
+            _stringify_number(section.get("tenderControlPrice")),
+            text_sources=[(RAW_TEXT_SOURCE, notice_text)],
+            field_hints=("最高", "限价", "控制价", "招标控制价"),
         )
 
         notice = Notice(
@@ -110,8 +122,14 @@ class HengyangConstructionAdapter(BaseAdapter):
             bid_open_or_response_deadline=(
                 notice_info.get("bidOpenTime") or notice_info.get("bidOpeningTimeStart") or deadline
             ).strip(),
-            budget_amount=_stringify_number(section.get("contractReckonPrice")),
-            ceiling_price=_stringify_number(section.get("tenderControlPrice")),
+            budget_amount=budget_context.raw_value,
+            ceiling_price=ceiling_context.raw_value,
+            budget_amount_unit=budget_context.unit or "",
+            budget_amount_unit_source=budget_context.unit_source,
+            budget_amount_raw_text_snippet=budget_context.raw_text_snippet,
+            ceiling_price_unit=ceiling_context.unit or "",
+            ceiling_price_unit_source=ceiling_context.unit_source,
+            ceiling_price_raw_text_snippet=ceiling_context.raw_text_snippet,
             procurement_method=(tender.get("tenderMode") or section.get("tenderType") or "").strip(),
             content_summary=content_summary,
             qualification_summary=qualification_summary,

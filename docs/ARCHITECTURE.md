@@ -69,9 +69,19 @@ tests/
 
 ## AI Analysis Alpha
 
-- `app/ai_analysis.py` 鎻愪緵榛樿鍏抽棴鐨?AI 杈呭姪鐮旀壒鑳藉姏锛屽彧鍦?`--local-html --ai-analysis` 鏃跺惎鐢ㄣ€?
-- AI 鍙宸茬粨鏋勫寲鐨?`Notice` 瀛楁锛屼笉閲嶆柊鎶撳彇銆佷笉鏀瑰彉 `lead_tier`锛屼笉鍐欏叆 SQLite锛屼笉杩涢涔︺€?
-- 鏃犲瘑閽ユ垨璇锋眰澶辫触鏃讹紝鏈湴 HTML 涓绘祦绋嬩繚鎸佸彲鐢紝浠呭湪鎺у埗鍙版垨 HTML 鎻愮ず AI 宸茶烦杩囥€?
+- `app/ai_analysis.py` 提供默认关闭的 AI 辅助研判能力，只在 `--local-html --ai-analysis` 时启用。
+- AI 只读取已结构化的 `Notice` 字段，不重新抓取、不改变 `lead_tier`，不写入 SQLite，也不进入飞书链路。
+- 无密钥或请求失败时，本地 HTML 主流程保持可用，仅在控制台或 HTML 中提示 AI 已跳过。
+- AI 自然语言字段必须输出简体中文；`recommendation` 内部仍保留 `follow_up / watch / skip` 枚举，展示层再映射为中文。
+- AI 的定位是“通用招投标 / 政府采购线索初筛助手”，不是某一单独行业的专家系统，也不应默认所有项目都是建设工程或设计咨询项目。
+- AI 会结合当前 profile、公告类型和命中信号动态调整分析重点；随着 profiles 增多，这一层应继续保持行业可扩展，而不是写死单一行业逻辑。
+- AI 只帮助业务人员判断是否值得进一步查看原公告，不替代人工审查招标文件、附件、资格条件和评分办法，不作为法律意见，也不作为最终投标决策。
+- AI 不输出中标概率，不对金额单位、资质条件、时间节点做无依据推断。
+- 对预算金额、最高限价等字段，若结构化输入未明确单位，则 prompt 和 HTML 都按“原始值 / 单位未确认”处理，避免把数字误读为万元或亿元。
+- AI 分析不是默认全量分析，而是用户按需启用的辅助研判；默认建议分析少量重点线索，默认 5 条，单次硬上限 10 条。
+- 当前仅分析聚合后 `DIRECT / WATCHLIST` 项目的代表公告，避免对全部抓取结果做无差别批量分析。
+- DeepSeek OpenAI-compatible 默认配置为：`DEEPSEEK_BASE_URL=https://api.deepseek.com`、`DEEPSEEK_MODEL=deepseek-v4-flash`。
+- 实际请求 endpoint 为：`https://api.deepseek.com/chat/completions`，`base_url` 由环境变量提供，`app/ai_analysis.py` 内部拼接 `/chat/completions`。
 
 ## 设计边界
 
@@ -79,3 +89,9 @@ tests/
 - profile 负责轻量行业筛选，不替代人工判断。
 - HTML 是默认本地输出路径。
 - 飞书是可选插件，不应作为核心运行前提。
+## Amount context
+
+- Amount-unit handling for existing sources is a runtime parsing concern layered on top of current structured fields.
+- Adapters keep the original numeric `budget_amount` / `ceiling_price` values and try to recover unit evidence from the current notice text.
+- Recovered evidence is passed forward as runtime-only context such as unit, unit source, and raw text snippet; this avoids a SQLite schema change.
+- HTML and AI share the same amount-context interpretation so the display layer and prompt layer do not diverge on unit handling.

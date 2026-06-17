@@ -5,7 +5,14 @@ from pathlib import Path
 from typing import Any
 
 from .adapters.registry import build_adapter as build_registered_adapter
-from .ai_analysis import AIAnalysisConfig, AIAnalysisResult, analyze_notices
+from .ai_analysis import (
+    AIAnalysisConfig,
+    AIAnalysisResult,
+    DEFAULT_AI_ANALYSIS_MAX_ITEMS,
+    MAX_AI_ANALYSIS_ITEMS,
+    analyze_notices,
+    normalize_ai_analysis_limit,
+)
 from .config import DATA_DIR, REPORT_DIR, ensure_runtime_dirs, load_keywords, load_pilot_notice_ids, load_sources
 from .dedupe import build_dedupe_key
 from .feishu import FeishuClient
@@ -312,12 +319,18 @@ def run_once(
         write_structured_preview_report(structured_preview_report_path(), preview_notices, keywords)
     if html_report:
         ai_results_by_project: dict[str, AIAnalysisResult] = {}
-        ai_status_message = ""
+        ai_status_messages: list[str] = []
         if enable_ai_analysis:
-            ai_config = AIAnalysisConfig.from_env(enabled=True, max_items=ai_analysis_limit)
+            requested_limit = ai_analysis_limit if ai_analysis_limit is not None else DEFAULT_AI_ANALYSIS_MAX_ITEMS
+            normalized_limit = normalize_ai_analysis_limit(ai_analysis_limit)
+            ai_config = AIAnalysisConfig.from_env(enabled=True, max_items=normalized_limit)
             candidate_projects = [
                 item for item in aggregate_notices(html_notices) if item.project_tier in {"DIRECT", "WATCHLIST"}
             ]
+            if requested_limit > MAX_AI_ANALYSIS_ITEMS:
+                ai_status_messages.append(
+                    f"AI 分析数量已限制为 {MAX_AI_ANALYSIS_ITEMS} 条，避免 API 额度消耗过大。"
+                )
             ai_results = analyze_notices(
                 [item.representative for item in candidate_projects],
                 ai_config,
@@ -327,7 +340,8 @@ def run_once(
                 ai_results_by_project[item.aggregation_key] = result
             skip_reasons = [result.skip_reason for result in ai_results if result.skipped and result.skip_reason]
             if skip_reasons:
-                ai_status_message = f"AI 分析已跳过：{skip_reasons[0]}"
+                ai_status_messages.append(f"AI 分析已跳过：{skip_reasons[0]}")
+        ai_status_message = " ".join(ai_status_messages)
         report_path = write_html_report(
             html_report_path(),
             html_notices,
