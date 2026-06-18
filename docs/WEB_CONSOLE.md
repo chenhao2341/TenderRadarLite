@@ -11,6 +11,7 @@ TenderRadarLite Web 控制台是本地优先的轻量浏览器入口。
 - Report 本地 HTML 报告入口
 - Logs 最近日志摘要
 - Config 配置状态遮罩展示
+- Sources 来源目录只读展示
 
 它不是 SaaS，不是登录后台，不是投标文件生成工作台。
 
@@ -37,6 +38,7 @@ python scripts/start_web_console.py
 - 不会从页面触发 Feishu 同步
 - 不会自动发送 webhook
 - 不会自动写入飞书多维表
+- 不会从 Sources 页面触发抓取
 
 ## 4. 默认不会调用 AI
 
@@ -45,6 +47,7 @@ python scripts/start_web_console.py
 - 默认推荐命令只包含 `--local-html`
 - 默认不包含 `--ai-analysis`
 - 页面不会主动触发模型调用
+- Sources 页面不会调用 AI 生成新来源
 
 ## 5. 如何打开 latest.html
 
@@ -87,31 +90,53 @@ python run_mvp.py --local-html --profile design_consulting
 
 日志页只读取 `logs/*.log`，不会读取 `.env`。
 
-## 8. 当前 Alpha 边界
+## 8. 如何查看来源目录
 
-当前只做本地 Web 控制台骨架，不包含：
+打开 `Sources` 页面可看到：
 
-- Source Catalog
+- 来源总数
+- supported / alpha / candidate / planned / blocked 统计
+- 来源名称、地区、来源类型、状态、adapter、访问风险、附件可能性、备注
+
+页面会明确提示：
+
+- `candidate / planned` 不代表已经支持抓取
+- `supported / alpha` 才与当前 adapter 有关
+- 本页只是来源知识库，不会触发抓取
+
+它不提供：
+
+- 新增/编辑/删除来源
+- 一键接入
+- 立即抓取
+- Feishu 操作
+- AI 操作
+
+## 9. 当前 Alpha 边界
+
+当前只做本地 Web 控制台骨架和只读来源目录，不包含：
+
 - 用户自定义来源
 - 附件下载
 - PDF / DOC / DOCX 解析
 - AI 招标文件研判
 - 投标文件生成
 - Word 导出
-- RAG / 向量库
+- 自动生成 adapter
+- 全国全站爬虫
 - 多用户 / 权限 / 后台
 
-## 9. 后续规划
+## 10. 后续规划
 
 后续阶段可以继续接入：
 
-- Source Catalog
+- 更丰富的 Source Catalog 元信息
 - 附件下载
 - AI 招标文件研判
 
-但这些能力不在当前 P1-4A 范围内。
+但这些能力不在当前 Alpha 范围内。
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### 页面里为什么没有“一键运行”？
 
@@ -133,4 +158,4 @@ python run_mvp.py --local-html --profile design_consulting
 
 ### 控制台会改数据库 schema 吗？
 
-当前不会。它只读取现有文件、目录、日志和报告状态。
+当前不会。它只读取现有文件、目录、日志、报告状态和来源目录配置。

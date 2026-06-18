@@ -1,0 +1,384 @@
+version: 1
+generated_for: P1-1 Source Catalog Alpha
+notes:
+  - "This file is a read-only source catalog."
+  - "candidate/planned/blocked entries are not supported adapters."
+sources:
+  - id: hengyang-construction
+    name: 衡阳分平台 / 建设工程交易
+    homepage: https://hengyang.hnsggzy.com/
+    list_entry_url: https://hengyang.hnsggzy.com/tradeApi/constructionTender/listByFile?regionCode=430400&current=1&size=10
+    region: 衡阳
+    source_type: public_resource_trading
+    supported_notice_types: ["招标公告", "中标候选人公示", "中标结果公告", "更正公告"]
+    adapter: app.adapters.hengyang_construction
+    status: supported
+    industry_profiles: ["design_consulting", "construction"]
+    has_detail_page: yes
+    has_attachments: likely
+    access_risk: low
+    anti_bot_risk: low
+    login_requirement: no
+    data_quality: high
+    update_frequency: frequent
+    notes: 当前原生衡阳建设工程来源，已存在本地 adapter，enabled 状态来自 config/sources.json。
+    source_from: native
+    reference_project: native_config_sources_json
+    license_note: Native adapter only. No third-party code reuse.
+  - id: hengyang-procurement
+    name: 衡阳分平台 / 政府采购交易
+    homepage: https://hengyang.hnsggzy.com/
+    list_entry_url: https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430400&current=1&size=10
+    region: 衡阳
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告", "废标公告"]
+    adapter: app.adapters.hengyang_procurement
+    status: alpha
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: yes
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: frequent
+    notes: 当前原生衡阳政府采购来源，已有本地 adapter，但 config/sources.json 当前 enabled=false，因此仅标记为 alpha。
+    source_from: native
+    reference_project: native_config_sources_json
+    license_note: Native adapter only. No third-party code reuse.
+  - id: china-government-procurement
+    name: 中国政府采购网
+    homepage: https://www.ccgp.gov.cn/
+    list_entry_url: https://www.ccgp.gov.cn/cggg/
+    region: 全国
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "中标成交公告", "更正公告", "终止公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: frequent
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录。参考 GitHub 同类项目与人工侦察，第三方代码与 LICENSE 均不复用。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: chongqing-government-procurement
+    name: 重庆市政府采购网
+    homepage: https://www.ccgp-chongqing.gov.cn/
+    list_entry_url: unknown
+    region: 重庆
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: unknown
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: liaoning-government-procurement
+    name: 辽宁政府采购网
+    homepage: http://www.ccgp-liaoning.gov.cn/
+    list_entry_url: unknown
+    region: 辽宁
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: unknown
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: zhejiang-government-procurement
+    name: 浙江政府采购网
+    homepage: https://zfcg.czt.zj.gov.cn/
+    list_entry_url: unknown
+    region: 浙江
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: unknown
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: guangxi-government-procurement
+    name: 广西政府采购网
+    homepage: http://zfcg.gxzf.gov.cn/
+    list_entry_url: unknown
+    region: 广西
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: unknown
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: qinghai-government-procurement
+    name: 青海政府采购网
+    homepage: http://www.ccgp-qinghai.gov.cn/
+    list_entry_url: unknown
+    region: 青海
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: candidate
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: unknown
+    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. License unclear projects are not reused.
+  - id: national-public-resource-platform
+    name: 全国公共资源交易平台
+    homepage: https://www.ggzy.gov.cn/
+    list_entry_url: unknown
+    region: 全国
+    source_type: public_resource_trading
+    supported_notice_types: ["招标公告", "中标公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "construction"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认稳定入口与字段结构，目前仅列入计划研究，不代表已经支持抓取。
+    source_from: manual_research
+    reference_project: P1-1R scout report
+    license_note: Planning record only.
+  - id: yunnan-public-resource-platform
+    name: 云南省公共资源交易平台
+    homepage: unknown
+    list_entry_url: unknown
+    region: 云南
+    source_type: public_resource_trading
+    supported_notice_types: ["招标公告", "中标公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "construction"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认入口，不编造 URL；当前仅作为计划研究来源。
+    source_from: manual_research
+    reference_project: manual_research_backlog
+    license_note: Planning record only.
+  - id: shaanxi-public-resource-platform
+    name: 陕西省公共资源交易平台
+    homepage: unknown
+    list_entry_url: unknown
+    region: 陕西
+    source_type: public_resource_trading
+    supported_notice_types: ["招标公告", "中标公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "construction"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认入口，不编造 URL；当前仅作为计划研究来源。
+    source_from: manual_research
+    reference_project: manual_research_backlog
+    license_note: Planning record only.
+  - id: ningxia-government-procurement
+    name: 宁夏政府采购网
+    homepage: unknown
+    list_entry_url: unknown
+    region: 宁夏
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认入口，不编造 URL；当前仅作为计划研究来源。
+    source_from: manual_research
+    reference_project: manual_research_backlog
+    license_note: Planning record only.
+  - id: xizang-government-procurement
+    name: 西藏政府采购网
+    homepage: unknown
+    list_entry_url: unknown
+    region: 西藏
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认入口，不编造 URL；当前仅作为计划研究来源。
+    source_from: manual_research
+    reference_project: manual_research_backlog
+    license_note: Planning record only.
+  - id: guangdong-government-procurement
+    name: 广东政府采购网
+    homepage: unknown
+    list_entry_url: unknown
+    region: 广东
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: planned
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 待后续人工确认入口，不编造 URL；当前仅作为计划研究来源。
+    source_from: manual_research
+    reference_project: manual_research_backlog
+    license_note: Planning record only.
+  - id: shanghai-government-procurement
+    name: 上海政府采购网
+    homepage: https://www.zfcg.sh.gov.cn/
+    list_entry_url: unknown
+    region: 上海
+    source_type: government_procurement
+    supported_notice_types: ["采购公告", "结果公告", "更正公告"]
+    adapter: ""
+    status: blocked
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: high
+    anti_bot_risk: high
+    login_requirement: unknown
+    data_quality: low
+    update_frequency: unknown
+    notes: 参考项目曾提示延迟与稳定性风险，当前 Alpha 不建议接入。
+    source_from: github_reference
+    reference_project: P1-1R scout report
+    license_note: Reference only. Do not reuse third-party code.
+  - id: pla-weapons-procurement
+    name: 全军武器装备采购信息网
+    homepage: unknown
+    list_entry_url: unknown
+    region: sensitive
+    source_type: unknown
+    supported_notice_types: ["unknown"]
+    adapter: ""
+    status: blocked
+    industry_profiles: ["design_consulting"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: high
+    anti_bot_risk: high
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 敏感范围，不适合当前 Alpha；只保留风险说明，不做接入研究。
+    source_from: manual_research
+    reference_project: scope_boundary
+    license_note: Blocked by project scope.
+  - id: military-procurement
+    name: 军队采购网
+    homepage: unknown
+    list_entry_url: unknown
+    region: sensitive
+    source_type: unknown
+    supported_notice_types: ["unknown"]
+    adapter: ""
+    status: blocked
+    industry_profiles: ["design_consulting"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: high
+    anti_bot_risk: high
+    login_requirement: unknown
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 敏感范围，不适合当前 Alpha；只保留风险说明，不做接入研究。
+    source_from: manual_research
+    reference_project: scope_boundary
+    license_note: Blocked by project scope.
+  - id: enterprise-procurement-portals
+    name: 企业采购门户集合
+    homepage: unknown
+    list_entry_url: unknown
+    region: multiple
+    source_type: enterprise_procurement
+    supported_notice_types: ["招标公告", "询价公告", "采购公告"]
+    adapter: ""
+    status: blocked
+    industry_profiles: ["design_consulting", "software_it"]
+    has_detail_page: unknown
+    has_attachments: unknown
+    access_risk: high
+    anti_bot_risk: high
+    login_requirement: yes
+    data_quality: unknown
+    update_frequency: unknown
+    notes: 登录、反爬和业务边界风险高，不适合作为当前 Alpha 的公开来源接入对象。
+    source_from: manual_research
+    reference_project: scope_boundary
+    license_note: Blocked by project scope.

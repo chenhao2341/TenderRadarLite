@@ -14,11 +14,47 @@ from urllib.parse import urlparse
 
 from dotenv import dotenv_values
 
+from .source_catalog import get_source_catalog_summary, list_sources, load_source_catalog, validate_source_catalog
+
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_PROFILE_ID = "design_consulting"
 SAFE_LOG_LINE_LIMIT = 40
+STATUS_LABELS = {
+    "supported": "已支持",
+    "alpha": "Alpha",
+    "candidate": "候选",
+    "planned": "计划研究",
+    "blocked": "暂不建议",
+}
+SOURCE_TYPE_LABELS = {
+    "government_procurement": "政府采购",
+    "public_resource_trading": "公共资源交易",
+    "industry_platform": "行业平台",
+    "enterprise_procurement": "企业采购",
+    "aggregator": "聚合来源",
+    "sensitive": "敏感来源",
+    "unknown": "未知",
+}
+RISK_LABELS = {
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "unknown": "未知",
+}
+ATTACHMENT_LABELS = {
+    "yes": "有",
+    "likely": "可能有",
+    "no": "无",
+    "unknown": "未知",
+}
+LOGIN_REQUIREMENT_LABELS = {
+    "no": "无需登录",
+    "likely": "可能需要",
+    "yes": "需要登录",
+    "unknown": "未知",
+}
 
 
 @dataclass(frozen=True)
@@ -38,6 +74,7 @@ class WebConsoleService:
         self.report_path = self.reports_dir / "latest.html"
         self.env_path = self.root_dir / ".env"
         self.env_example_path = self.root_dir / ".env.example"
+        self.source_catalog_path = self.root_dir / "config" / "source_catalog.yaml"
 
     def handle_api_request(self, method: str, path: str) -> dict[str, Any]:
         routes: dict[tuple[str, str], Any] = {
@@ -46,6 +83,7 @@ class WebConsoleService:
             ("GET", "/api/logs"): self.get_logs_payload,
             ("GET", "/api/config-status"): self.get_config_status_payload,
             ("GET", "/api/profiles"): self.get_profiles_payload,
+            ("GET", "/api/source-catalog"): self.get_source_catalog_payload,
             ("GET", "/api/run"): self.get_run_payload,
             ("POST", "/api/run"): self.get_run_action_payload,
         }
@@ -61,6 +99,7 @@ class WebConsoleService:
             "report": self._render_report_page,
             "logs": self._render_logs_page,
             "config": self._render_config_page,
+            "sources": self._render_sources_page,
         }
         builder = builders.get(page, self._render_dashboard_page)
         return self._render_layout(page, builder())
@@ -70,6 +109,7 @@ class WebConsoleService:
         config = self.get_config_status_payload()
         git_status = self._get_git_status()
         logs = self.get_logs_payload()
+        source_catalog = self.get_source_catalog_payload()
         return {
             "project": {
                 "name": "TenderRadarLite 本地控制台",
@@ -98,6 +138,10 @@ class WebConsoleService:
             "logs": {
                 "latest_file": logs["latest_file"],
                 "latest_lines": logs["latest_lines"][:5],
+            },
+            "source_catalog": {
+                "summary": source_catalog["summary"],
+                "safe_notice": source_catalog["safe_notice"],
             },
             "recommended_command": self._build_recommended_command(),
         }
@@ -209,6 +253,19 @@ class WebConsoleService:
             "company_profile": self._detect_company_profile(),
         }
 
+    def get_source_catalog_payload(self) -> dict[str, Any]:
+        catalog = load_source_catalog(self.source_catalog_path)
+        errors = validate_source_catalog(catalog)
+        summary = get_source_catalog_summary(catalog)
+        return {
+            "summary": summary,
+            "sources": list_sources(catalog),
+            "validation_errors": errors,
+            "safe_notice": "候选 / 计划研究 不代表已经支持抓取；本页只是来源知识库，不会触发抓取。",
+            "will_trigger_feishu": False,
+            "will_trigger_ai": False,
+        }
+
     def _load_env_values(self) -> dict[str, str]:
         if not self.env_path.exists():
             return {}
@@ -317,6 +374,7 @@ class WebConsoleService:
           {self._card("报告状态", f"<p>本地报告：<strong>{'已生成' if report['exists'] else '未生成'}</strong></p><p>更新时间：{html.escape(report['updated_at'] or '暂无')}</p>")}
           {self._card("配置状态", f"<p>AI 分析：<strong>{html.escape(status['integrations']['ai_analysis'])}</strong></p><p>飞书：<strong>{html.escape(status['integrations']['feishu'])}</strong></p>")}
           {self._card("配置概览", f"<p>行业配置：<strong>{len(status['profiles']['available_profiles'])}</strong></p><p>企业画像：<strong>{html.escape(status['profiles']['company_profile_status'])}</strong></p>")}
+          {self._card("来源目录摘要", self._render_source_summary(status["source_catalog"]["summary"]))}
         </section>
         <section class="panel">
           <div class="panel-header"><h2>最近日志摘要</h2><a href="/logs">查看全部</a></div>
@@ -403,6 +461,92 @@ class WebConsoleService:
         </section>
         """
 
+    def _render_sources_page(self) -> str:
+        payload = self.get_source_catalog_payload()
+        summary = payload["summary"]
+        rows = []
+        for source in payload["sources"]:
+            source_type = self._source_type_label(source.get("source_type"))
+            status = self._status_label_text(source.get("status"))
+            access_risk = self._risk_label(source.get("access_risk"))
+            attachments = self._attachment_label(source.get("has_attachments"))
+            rows.append(
+                "<tr>"
+                f"<td class=\"name-cell\">{html.escape(str(source.get('name', '')))}</td>"
+                f"<td class=\"region-cell\">{html.escape(str(source.get('region', '')))}</td>"
+                f"<td class=\"type-cell\"><span class=\"badge badge-type\">{html.escape(source_type)}</span></td>"
+                f"<td class=\"status-cell\"><span class=\"badge badge-status status-{html.escape(str(source.get('status') or 'unknown'))}\">{html.escape(status)}</span></td>"
+                f"<td class=\"adapter-cell\"><code>{html.escape(str(source.get('adapter') or '-'))}</code></td>"
+                f"<td class=\"risk-cell\"><span class=\"badge badge-risk risk-{html.escape(str(source.get('access_risk') or 'unknown'))}\">{html.escape(access_risk)}</span></td>"
+                f"<td class=\"attachments-cell\"><span class=\"badge badge-attachment\">{html.escape(attachments)}</span></td>"
+                f"<td class=\"notes-cell\">{html.escape(str(source.get('notes', '')))}</td>"
+                "</tr>"
+            )
+        validation_block = ""
+        if payload["validation_errors"]:
+            validation_items = "".join(f"<li>{html.escape(item)}</li>" for item in payload["validation_errors"])
+            validation_block = f"<section class='panel'><div class='panel-header'><h2>校验提醒</h2></div><ul>{validation_items}</ul></section>"
+        return f"""
+        <section class="panel">
+          <div class="panel-header"><h1>来源目录</h1></div>
+          <p>{html.escape(payload['safe_notice'])}</p>
+          <p>已支持 / Alpha 才与当前 adapter 有关；候选 / 计划研究 / 暂不建议 仅用于来源知识库记录。</p>
+          <p>本页不会新增、编辑、删除来源，也不会提供接入按钮、抓取按钮、Feishu 或 AI 操作。</p>
+        </section>
+        <section class="grid">
+          {self._card("来源总数", f"<p><strong>{summary['total']}</strong></p>")}
+          {self._card("状态统计", self._render_source_summary(summary))}
+        </section>
+        <section class="panel">
+          <div class="panel-header"><h2>来源清单</h2></div>
+          <div class="table-wrap">
+          <table class="source-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>地区</th>
+                <th>来源类型</th>
+                <th>状态</th>
+                <th>adapter</th>
+                <th>访问风险</th>
+                <th>附件可能性</th>
+                <th>备注</th>
+              </tr>
+            </thead>
+            <tbody>{''.join(rows)}</tbody>
+          </table>
+          </div>
+        </section>
+        {validation_block}
+        """
+
+    def _render_source_summary(self, summary: dict[str, Any]) -> str:
+        by_status = summary.get("by_status", {})
+        return (
+            f"<p>来源总数：<strong>{summary.get('total', 0)}</strong></p>"
+            f"<p>已支持：<strong>{by_status.get('supported', 0)}</strong></p>"
+            f"<p>Alpha：<strong>{by_status.get('alpha', 0)}</strong></p>"
+            f"<p>候选：<strong>{by_status.get('candidate', 0)}</strong></p>"
+            f"<p>计划研究：<strong>{by_status.get('planned', 0)}</strong></p>"
+            f"<p>暂不建议：<strong>{by_status.get('blocked', 0)}</strong></p>"
+        )
+
+    def _status_label_text(self, value: Any) -> str:
+        normalized = str(value or "").strip()
+        return STATUS_LABELS.get(normalized, normalized or "未知")
+
+    def _source_type_label(self, value: Any) -> str:
+        normalized = str(value or "").strip()
+        return SOURCE_TYPE_LABELS.get(normalized, normalized or "未知")
+
+    def _risk_label(self, value: Any) -> str:
+        normalized = str(value or "").strip()
+        return RISK_LABELS.get(normalized, normalized or "未知")
+
+    def _attachment_label(self, value: Any) -> str:
+        normalized = str(value or "").strip()
+        return ATTACHMENT_LABELS.get(normalized, normalized or "未知")
+
     def _render_status_table(self, payload: dict[str, Any]) -> str:
         rows = []
         for key, value in payload.items():
@@ -446,6 +590,7 @@ class WebConsoleService:
             ("report", "/report", "报告入口"),
             ("logs", "/logs", "日志"),
             ("config", "/config", "配置状态"),
+            ("sources", "/sources", "来源目录"),
         ]
         links = []
         for key, path, label in items:
@@ -469,13 +614,14 @@ class WebConsoleRequestHandler(BaseHTTPRequestHandler):
     def _dispatch(self, method: str) -> None:
         parsed = urlparse(self.path)
         try:
-            if parsed.path in {"/", "/run", "/report", "/logs", "/config"}:
+            if parsed.path in {"/", "/run", "/report", "/logs", "/config", "/sources"}:
                 page_name = {
                     "/": "dashboard",
                     "/run": "run",
                     "/report": "report",
                     "/logs": "logs",
                     "/config": "config",
+                    "/sources": "sources",
                 }[parsed.path]
                 self._send_html(self.service.render_page(page_name))
                 return

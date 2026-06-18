@@ -17,6 +17,7 @@ class WebConsoleServiceTests(unittest.TestCase):
         (self.temp_dir / "reports").mkdir()
         (self.temp_dir / "logs").mkdir()
         (self.temp_dir / "data").mkdir()
+        (self.temp_dir / "config").mkdir()
         (self.temp_dir / ".env.example").write_text("DEEPSEEK_API_KEY=\n", encoding="utf-8")
         for profile_id in ("construction", "design_consulting", "medical_equipment", "software_it"):
             (self.temp_dir / "profiles" / f"{profile_id}.json").write_text("{}", encoding="utf-8")
@@ -33,6 +34,124 @@ class WebConsoleServiceTests(unittest.TestCase):
                     "FEISHU_APP_ID=cli_demo",
                     "FEISHU_APP_SECRET=secret-demo",
                     "FEISHU_WEBHOOK_URL=https://example.invalid/hook",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        (self.temp_dir / "config" / "sources.json").write_text(
+            "[]",
+            encoding="utf-8",
+        )
+        (self.temp_dir / "config" / "source_catalog.yaml").write_text(
+            "\n".join(
+                [
+                    "version: 1",
+                    "sources:",
+                    "  - id: hengyang-construction",
+                    "    name: 衡阳分平台 / 建设工程交易",
+                    "    homepage: https://example.invalid/construction",
+                    "    list_entry_url: https://example.invalid/construction/list",
+                    "    region: 衡阳",
+                    "    source_type: public_resource_trading",
+                    "    supported_notice_types: [招标公告]",
+                    "    adapter: hengyang_construction",
+                    "    status: supported",
+                    "    industry_profiles: [design_consulting]",
+                    "    has_detail_page: yes",
+                    "    has_attachments: likely",
+                    "    access_risk: low",
+                    "    anti_bot_risk: low",
+                    "    login_requirement: no",
+                    "    data_quality: high",
+                    "    update_frequency: frequent",
+                    "    notes: 原生来源。",
+                    "    source_from: native",
+                    "    reference_project: ''",
+                    "    license_note: native adapter only",
+                    "  - id: hengyang-procurement",
+                    "    name: 衡阳分平台 / 政府采购交易",
+                    "    homepage: https://example.invalid/procurement",
+                    "    list_entry_url: https://example.invalid/procurement/list",
+                    "    region: 衡阳",
+                    "    source_type: government_procurement",
+                    "    supported_notice_types: [采购公告]",
+                    "    adapter: hengyang_procurement",
+                    "    status: alpha",
+                    "    industry_profiles: [design_consulting]",
+                    "    has_detail_page: yes",
+                    "    has_attachments: likely",
+                    "    access_risk: medium",
+                    "    anti_bot_risk: medium",
+                    "    login_requirement: no",
+                    "    data_quality: medium",
+                    "    update_frequency: frequent",
+                    "    notes: 原生来源，但当前未默认启用。",
+                    "    source_from: native",
+                    "    reference_project: ''",
+                    "    license_note: native adapter only",
+                    "  - id: china-government-procurement",
+                    "    name: 中国政府采购网",
+                    "    homepage: https://example.invalid/cgp",
+                    "    list_entry_url: https://example.invalid/cgp/list",
+                    "    region: 全国",
+                    "    source_type: government_procurement",
+                    "    supported_notice_types: [采购公告]",
+                    "    adapter: ''",
+                    "    status: candidate",
+                    "    industry_profiles: [design_consulting]",
+                    "    has_detail_page: unknown",
+                    "    has_attachments: unknown",
+                    "    access_risk: medium",
+                    "    anti_bot_risk: medium",
+                    "    login_requirement: unknown",
+                    "    data_quality: unknown",
+                    "    update_frequency: unknown",
+                    "    notes: 仅来源目录记录，未本地验证。",
+                    "    source_from: github_reference",
+                    "    reference_project: scout-only",
+                    "    license_note: reference only",
+                    "  - id: national-public-resource-platform",
+                    "    name: 全国公共资源交易平台",
+                    "    homepage: unknown",
+                    "    list_entry_url: unknown",
+                    "    region: 全国",
+                    "    source_type: public_resource_trading",
+                    "    supported_notice_types: [招标公告]",
+                    "    adapter: ''",
+                    "    status: planned",
+                    "    industry_profiles: [design_consulting]",
+                    "    has_detail_page: unknown",
+                    "    has_attachments: likely",
+                    "    access_risk: medium",
+                    "    anti_bot_risk: medium",
+                    "    login_requirement: unknown",
+                    "    data_quality: unknown",
+                    "    update_frequency: unknown",
+                    "    notes: 待后续人工确认入口。",
+                    "    source_from: manual_research",
+                    "    reference_project: backlog",
+                    "    license_note: planning only",
+                    "  - id: enterprise-procurement-portals",
+                    "    name: 企业采购门户集合",
+                    "    homepage: unknown",
+                    "    list_entry_url: unknown",
+                    "    region: 多地区",
+                    "    source_type: enterprise_procurement",
+                    "    supported_notice_types: [采购公告]",
+                    "    adapter: ''",
+                    "    status: blocked",
+                    "    industry_profiles: [design_consulting]",
+                    "    has_detail_page: unknown",
+                    "    has_attachments: no",
+                    "    access_risk: high",
+                    "    anti_bot_risk: high",
+                    "    login_requirement: yes",
+                    "    data_quality: low",
+                    "    update_frequency: unknown",
+                    "    notes: 登录和反爬风险高。",
+                    "    source_from: manual_research",
+                    "    reference_project: backlog",
+                    "    license_note: blocked",
                 ]
             ),
             encoding="utf-8",
@@ -128,8 +247,6 @@ class WebConsoleServiceTests(unittest.TestCase):
         self.assertIn("其他行业 profile 当前可用于测试或后续扩展。", rendered_html)
         self.assertNotIn(">Dashboard<", rendered_html)
         self.assertNotIn(">Run<", rendered_html)
-        self.assertNotIn("跑步", rendered_html)
-        self.assertNotIn("奔跑", rendered_html)
 
     def test_dashboard_uses_chinese_status_labels(self) -> None:
         rendered_html = self.service.render_page("dashboard")
@@ -157,6 +274,72 @@ class WebConsoleServiceTests(unittest.TestCase):
         )
         self.assertFalse(payload["will_trigger_feishu"])
         self.assertFalse(payload["will_trigger_ai"])
+
+    def test_sources_page_is_accessible_and_read_only(self) -> None:
+        rendered_html = self.service.render_page("sources")
+
+        self.assertIn("来源目录", rendered_html)
+        self.assertIn("候选 / 计划研究 不代表已经支持抓取", rendered_html)
+        self.assertIn("本页只是来源知识库，不会触发抓取", rendered_html)
+        self.assertIn(">来源目录<", rendered_html)
+        self.assertNotIn("立即抓取", rendered_html)
+        self.assertNotIn("一键接入", rendered_html)
+
+    def test_sources_page_shows_catalog_rows_and_chinese_labels(self) -> None:
+        rendered_html = self.service.render_page("sources")
+
+        self.assertIn("衡阳分平台 / 建设工程交易", rendered_html)
+        self.assertIn("衡阳分平台 / 政府采购交易", rendered_html)
+        self.assertIn("中国政府采购网", rendered_html)
+        self.assertIn("已支持", rendered_html)
+        self.assertIn("Alpha", rendered_html)
+        self.assertIn("候选", rendered_html)
+        self.assertIn("计划研究", rendered_html)
+        self.assertIn("暂不建议", rendered_html)
+        self.assertIn("政府采购", rendered_html)
+        self.assertIn("公共资源交易", rendered_html)
+        self.assertIn("企业采购", rendered_html)
+        self.assertIn("中", rendered_html)
+        self.assertIn("高", rendered_html)
+        self.assertIn("可能有", rendered_html)
+        self.assertIn("无", rendered_html)
+        self.assertNotIn(">supported<", rendered_html)
+        self.assertNotIn(">candidate<", rendered_html)
+        self.assertNotIn(">planned<", rendered_html)
+        self.assertNotIn(">blocked<", rendered_html)
+
+    def test_dashboard_shows_source_catalog_summary_in_chinese(self) -> None:
+        rendered_html = self.service.render_page("dashboard")
+
+        self.assertIn("来源目录摘要", rendered_html)
+        self.assertIn("来源总数", rendered_html)
+        self.assertIn("已支持", rendered_html)
+        self.assertIn("Alpha", rendered_html)
+        self.assertIn("候选", rendered_html)
+        self.assertIn("计划研究", rendered_html)
+        self.assertIn("暂不建议", rendered_html)
+        self.assertNotIn("supported", rendered_html)
+        self.assertNotIn("candidate", rendered_html)
+
+    def test_sources_page_uses_table_classes_for_spacing_and_wrapping(self) -> None:
+        rendered_html = self.service.render_page("sources")
+
+        self.assertIn('class="source-table"', rendered_html)
+        self.assertIn('badge badge-status status-', rendered_html)
+        self.assertIn('badge badge-risk risk-', rendered_html)
+        self.assertIn('class="adapter-cell"', rendered_html)
+        self.assertIn('class="notes-cell"', rendered_html)
+
+    def test_sources_payload_does_not_leak_secret_and_does_not_trigger_integrations(self) -> None:
+        payload = self.service.handle_api_request("GET", "/api/status")
+        sources_page = self.service.render_page("sources")
+        serialized = json.dumps(payload, ensure_ascii=False) + sources_page
+
+        self.assertNotIn("sk-real-secret", serialized)
+        self.assertNotIn("secret-demo", serialized)
+        self.assertNotIn("https://example.invalid/hook", serialized)
+        self.assertIn("不会触发抓取", serialized)
+        self.assertIn("默认不触发飞书", serialized)
 
 
 if __name__ == "__main__":

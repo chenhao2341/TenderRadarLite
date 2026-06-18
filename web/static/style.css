@@ -187,9 +187,165 @@ table {
   border-collapse: collapse;
 }
 
+th,
 td {
-  padding: 8px 0;
+  padding: 12px 10px;
   border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.source-table {
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.source-table th:nth-child(1),
+.source-table td:nth-child(1) {
+  width: 18%;
+}
+
+.source-table th:nth-child(2),
+.source-table td:nth-child(2) {
+  width: 10%;
+}
+
+.source-table th:nth-child(3),
+.source-table td:nth-child(3) {
+  width: 12%;
+}
+
+.source-table th:nth-child(4),
+.source-table td:nth-child(4) {
+  width: 10%;
+}
+
+.source-table th:nth-child(5),
+.source-table td:nth-child(5) {
+  width: 16%;
+}
+
+.source-table th:nth-child(6),
+.source-table td:nth-child(6) {
+  width: 10%;
+}
+
+.source-table th:nth-child(7),
+.source-table td:nth-child(7) {
+  width: 10%;
+}
+
+.source-table th:nth-child(8),
+.source-table td:nth-child(8) {
+  width: 14%;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.badge-type {
+  background: #eef3e8;
+  color: #48613f;
+}
+
+.badge-status {
+  background: #e6f2ef;
+  color: var(--accent-strong);
+}
+
+.status-supported {
+  background: #dff4ea;
+  color: #166744;
+}
+
+.status-alpha {
+  background: #eaf0ff;
+  color: #2f4d94;
+}
+
+.status-candidate {
+  background: #fff4d9;
+  color: #8a6115;
+}
+
+.status-planned {
+  background: #f3ebff;
+  color: #6a3aa5;
+}
+
+.status-blocked {
+  background: #fde6e3;
+  color: #a33b2b;
+}
+
+.badge-risk,
+.badge-attachment {
+  background: var(--surface-strong);
+  color: var(--muted);
+}
+
+.risk-low {
+  background: #e3f3e6;
+  color: #246a38;
+}
+
+.risk-medium {
+  background: #fff0d6;
+  color: #8a5a09;
+}
+
+.risk-high {
+  background: #fde4df;
+  color: #9d2d21;
+}
+
+.risk-unknown {
+  background: #ece9df;
+  color: #6a665b;
+}
+
+.adapter-cell code {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #f4efe4;
+  color: #34514d;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.notes-cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+ }
+
+.type-cell,
+.status-cell,
+.risk-cell,
+.attachments-cell {
+  white-space: nowrap;
 }
 
 .error {
