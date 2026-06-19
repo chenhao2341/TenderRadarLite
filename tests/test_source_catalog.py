@@ -64,10 +64,13 @@ class SourceCatalogTests(unittest.TestCase):
         catalog = load_source_catalog()
         grouped = group_sources_by_status(catalog)
 
+        self.assertEqual(len(grouped["supported"]), 2)
+        self.assertEqual(len(grouped["alpha"]), 0)
         self.assertEqual(len(grouped["candidate"]), 6)
         self.assertEqual(len(grouped["planned"]), 6)
         self.assertEqual(len(grouped["blocked"]), 4)
-        self.assertEqual(list_sources(catalog, status="supported")[0]["name"], "衡阳分平台 / 建设工程交易")
+        supported_ids = {item["id"] for item in list_sources(catalog, status="supported")}
+        self.assertEqual(supported_ids, {"hengyang-construction", "hengyang-procurement"})
         self.assertEqual(find_source_by_id(catalog, "china-government-procurement")["status"], "candidate")
 
     def test_github_reference_sources_cannot_be_marked_supported(self) -> None:
@@ -88,14 +91,23 @@ class SourceCatalogTests(unittest.TestCase):
             {
                 "total": 18,
                 "by_status": {
-                    "supported": 1,
-                    "alpha": 1,
+                    "supported": 2,
+                    "alpha": 0,
                     "candidate": 6,
                     "planned": 6,
                     "blocked": 4,
                 },
             },
         )
+
+    def test_procurement_source_is_now_supported_native_source(self) -> None:
+        catalog = load_source_catalog()
+        procurement = find_source_by_id(catalog, "hengyang-procurement")
+
+        self.assertIsNotNone(procurement)
+        self.assertEqual(procurement["status"], "supported")
+        self.assertEqual(procurement["adapter"], "app.adapters.hengyang_procurement")
+        self.assertEqual(procurement["source_from"], "native")
 
     def test_summary_and_sources_do_not_leak_secret_like_fields(self) -> None:
         catalog = load_source_catalog()

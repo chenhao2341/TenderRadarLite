@@ -464,12 +464,12 @@ class OptionalFeishuOutputTests(unittest.TestCase):
 
 
 class SourceConfigTests(unittest.TestCase):
-    def test_procurement_source_is_disabled_in_formal_run(self) -> None:
+    def test_procurement_source_is_enabled_as_second_real_source(self) -> None:
         sources = load_sources()
         procurement = next(source for source in sources if source["class"] == "HengyangProcurementAdapter")
         construction = next(source for source in sources if source["class"] == "HengyangConstructionAdapter")
 
-        self.assertFalse(procurement["enabled"])
+        self.assertTrue(procurement["enabled"])
         self.assertEqual(construction["pages_scanned"], 3)
         self.assertEqual(construction["page_size"], 10)
 

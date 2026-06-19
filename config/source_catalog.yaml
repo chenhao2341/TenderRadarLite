@@ -33,7 +33,7 @@ sources:
     source_type: government_procurement
     supported_notice_types: ["采购公告", "结果公告", "更正公告", "废标公告"]
     adapter: app.adapters.hengyang_procurement
-    status: alpha
+    status: supported
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: yes
     has_attachments: likely
@@ -42,7 +42,7 @@ sources:
     login_requirement: no
     data_quality: medium
     update_frequency: frequent
-    notes: 当前原生衡阳政府采购来源，已有本地 adapter，但 config/sources.json 当前 enabled=false，因此仅标记为 alpha。
+    notes: 当前原生衡阳政府采购来源，已有本地 adapter，并已真实接入当前主流程，作为同一衡阳平台下的第二真实来源。这只代表双来源真实采集，不代表跨网站或全国多来源支持。
     source_from: native
     reference_project: native_config_sources_json
     license_note: Native adapter only. No third-party code reuse.
