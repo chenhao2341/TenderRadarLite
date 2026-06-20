@@ -46,6 +46,10 @@ class HtmlReportV2Tests(unittest.TestCase):
             fetched_at="2026-06-15 12:00:00",
         )
 
+    def _source_group_slice(self, html: str, source_label: str) -> str:
+        start = html.index(source_label)
+        return html[start : start + 1800]
+
     def test_report_aggregates_related_notices_into_one_project_card(self) -> None:
         notices = [
             self._notice(
@@ -92,7 +96,7 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertIn("聚合项目数", html)
         self.assertIn("4", html)
         self.assertIn("3", html)
-        self.assertEqual(html.count("Direct Project"), 1)
+        self.assertGreaterEqual(html.count("Direct Project"), 2)
         self.assertIn("关联公告 2 条", html)
         self.assertIn("招标公告", html)
         self.assertIn("更正公告", html)
@@ -322,6 +326,129 @@ class HtmlReportV2Tests(unittest.TestCase):
 
         self.assertIn("来源", html)
         self.assertIn("长沙公共资源交易平台 / 长沙政府采购交易", html)
+
+    def test_report_adds_region_source_section_with_catalog_status_and_counts(self) -> None:
+        hengyang_construction = self._notice(
+            project_name="Hengyang Construction Project",
+            suffix="hy-construction",
+            lead_tier="DIRECT",
+            section_id="section-hy-construction",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        hengyang_construction.source = "衡阳分平台"
+        hengyang_construction.source_subtype = "建设工程交易"
+        hengyang_construction.region = "衡阳"
+
+        hengyang_procurement = self._notice(
+            project_name="Hengyang Procurement Project",
+            suffix="hy-procurement",
+            lead_tier="WATCHLIST",
+            section_id="section-hy-procurement",
+            notice_type="GENGZHENG_NOTICE",
+            publish_time="2026-06-15 10:00:00",
+        )
+        hengyang_procurement.source = "衡阳分平台"
+        hengyang_procurement.source_subtype = "政府采购交易"
+        hengyang_procurement.region = "衡阳"
+
+        changsha_direct = self._notice(
+            project_name="Changsha Direct Project",
+            suffix="cs-direct",
+            lead_tier="DIRECT",
+            section_id="section-cs-direct",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-17 10:00:00",
+        )
+        changsha_direct.source = "长沙公共资源交易平台"
+        changsha_direct.source_subtype = "长沙政府采购交易"
+        changsha_direct.region = "长沙"
+
+        changsha_exclude = self._notice(
+            project_name="Changsha Exclude Project",
+            suffix="cs-exclude",
+            lead_tier="EXCLUDE",
+            section_id="section-cs-exclude",
+            notice_type="GENGZHENG_NOTICE",
+            publish_time="2026-06-14 10:00:00",
+        )
+        changsha_exclude.source = "长沙公共资源交易平台"
+        changsha_exclude.source_subtype = "长沙政府采购交易"
+        changsha_exclude.region = "长沙"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(
+                report_path,
+                [hengyang_construction, hengyang_procurement, changsha_direct, changsha_exclude],
+                source_count=3,
+                generated_at="2026-06-17 12:00:00",
+            )
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("按地区与来源查看", html)
+        self.assertIn("衡阳", html)
+        self.assertIn("长沙", html)
+        self.assertIn("DIRECT 直接商机", html)
+        self.assertIn("WATCHLIST 待复核", html)
+        self.assertIn("EXCLUDE 排除项", html)
+
+        construction_slice = self._source_group_slice(html, "衡阳分平台 / 建设工程交易")
+        self.assertIn(">supported<", construction_slice)
+        self.assertIn("公告数量</strong><span>1</span>", construction_slice)
+        self.assertIn("DIRECT 数</strong><span>1</span>", construction_slice)
+
+        procurement_slice = self._source_group_slice(html, "衡阳分平台 / 政府采购交易")
+        self.assertIn(">supported<", procurement_slice)
+        self.assertIn("WATCHLIST 数</strong><span>1</span>", procurement_slice)
+
+        changsha_slice = self._source_group_slice(html, "长沙公共资源交易平台 / 长沙政府采购交易")
+        self.assertIn(">alpha<", changsha_slice)
+        self.assertNotIn(">supported<", changsha_slice)
+        self.assertIn("公告数量</strong><span>2</span>", changsha_slice)
+        self.assertIn("DIRECT 数</strong><span>1</span>", changsha_slice)
+        self.assertIn("EXCLUDE 数</strong><span>1</span>", changsha_slice)
+        self.assertIn("最近发布时间</strong><span>2026-06-17 10:00:00</span>", changsha_slice)
+
+    def test_report_groups_unknown_region_and_missing_subtype_conservatively(self) -> None:
+        unknown_region_notice = self._notice(
+            project_name="Unknown Region Project",
+            suffix="unknown-region",
+            lead_tier="WATCHLIST",
+            section_id="section-unknown-region",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        unknown_region_notice.region = ""
+        unknown_region_notice.source = "长沙公共资源交易平台"
+        unknown_region_notice.source_subtype = ""
+
+        subtype_only_notice = self._notice(
+            project_name="Subtype Only Project",
+            suffix="subtype-only",
+            lead_tier="DIRECT",
+            section_id="section-subtype-only",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-15 10:00:00",
+        )
+        subtype_only_notice.region = ""
+        subtype_only_notice.source = ""
+        subtype_only_notice.source_subtype = "政府采购交易"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(
+                report_path,
+                [unknown_region_notice, subtype_only_notice],
+                source_count=1,
+                generated_at="2026-06-16 12:00:00",
+            )
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("地区未确认", html)
+        self.assertIn("长沙公共资源交易平台", html)
+        self.assertIn("政府采购交易", html)
+        self.assertIn("按地区与来源查看", html)
 
     def test_report_uses_readable_link_label_when_employee_url_exists(self) -> None:
         notice = self._notice(

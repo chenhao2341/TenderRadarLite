@@ -15,6 +15,7 @@ from .attachment_utils import ATTACHMENT_REVIEW_HINT, attachment_category_label
 from .company_profile import CompanyProfile
 from .models import Notice
 from .opportunity_stage import opportunity_stage_label
+from .source_catalog import load_source_catalog
 
 
 REPORT_TITLE = "TenderRadarLite 本地招投标线索报告"
@@ -70,6 +71,18 @@ class ProjectReportItem:
     qualification_summary_source_label: str | None
 
 
+@dataclass
+class SourceReportGroup:
+    region_label: str
+    source_label: str
+    source_status: str
+    notice_count: int
+    project_count: int
+    tier_counts: dict[str, int]
+    latest_publish_time: str
+    items: list[ProjectReportItem]
+
+
 def write_html_report(
     path: Path,
     notices: Iterable[Notice],
@@ -111,6 +124,7 @@ def build_html_report(
     projects = aggregate_notices(notices)
     ai_results = ai_results or {}
     project_counts = Counter(item.project_tier for item in projects)
+    source_groups = _build_source_groups(notices, projects)
     stat_cards = [
         ("本轮公告数", str(len(notices)), "本轮抓取并进入本地报告的公告总数"),
         ("聚合项目数", str(len(projects)), "按项目或标段聚合后的展示对象数量"),
@@ -132,6 +146,7 @@ def build_html_report(
         body_sections = "".join(
             [
                 _render_company_business_view(projects, company_profile) if company_profile is not None else "",
+                _render_region_source_section(source_groups, ai_results=ai_results),
                 _render_primary_section("DIRECT", grouped["DIRECT"], ai_results=ai_results),
                 _render_primary_section("WATCHLIST", grouped["WATCHLIST"], ai_results=ai_results),
                 _render_exclude_section(grouped["EXCLUDE"], ai_results=ai_results),
@@ -308,6 +323,95 @@ def build_html_report(
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       padding: 18px 22px 22px;
+    }}
+    .source-region-list {{
+      display: grid;
+      gap: 18px;
+      padding: 18px 22px 22px;
+    }}
+    .source-region-block {{
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-soft);
+    }}
+    .source-region-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 14px;
+    }}
+    .source-region-title {{
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }}
+    .source-group-list {{
+      display: grid;
+      gap: 12px;
+    }}
+    .source-group-card {{
+      border-radius: 18px;
+      border: 1px solid rgba(110, 94, 72, 0.12);
+      background: rgba(255,255,255,0.74);
+      overflow: hidden;
+    }}
+    .source-group-card > summary {{
+      cursor: pointer;
+      list-style: none;
+      padding: 16px 18px;
+    }}
+    .source-group-card > summary::-webkit-details-marker {{ display: none; }}
+    .source-group-title {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }}
+    .source-group-title strong {{
+      font-size: 16px;
+      line-height: 1.5;
+    }}
+    .source-status {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: lowercase;
+      white-space: nowrap;
+    }}
+    .source-status.supported {{
+      color: var(--direct);
+      background: var(--direct-soft);
+    }}
+    .source-status.alpha {{
+      color: var(--watch);
+      background: var(--watch-soft);
+    }}
+    .source-status.unknown {{
+      color: var(--muted);
+      background: rgba(239, 232, 221, 0.92);
+    }}
+    .source-summary-grid {{
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }}
+    .source-summary-grid .fact {{
+      background: rgba(252, 248, 241, 0.92);
+    }}
+    .source-project-list {{
+      display: grid;
+      gap: 14px;
+      padding: 0 18px 18px;
     }}
     .company-card {{
       display: grid;
@@ -715,6 +819,7 @@ def build_html_report(
     @media (max-width: 1180px) {{
       .hero-grid,
       .stats,
+      .source-summary-grid,
       .company-zone-grid,
       .fact-grid,
       .signal-grid,
@@ -728,7 +833,9 @@ def build_html_report(
       .hero-meta {{ grid-template-columns: 1fr; }}
       .project-top,
       .project-actions,
-      .section-header {{
+      .section-header,
+      .source-region-header,
+      .source-group-title {{
         flex-direction: column;
         align-items: flex-start;
       }}
@@ -1041,6 +1148,68 @@ def _render_primary_section(tier: str, items: list[ProjectReportItem], *, ai_res
     """
 
 
+def _render_region_source_section(groups: list[SourceReportGroup], *, ai_results: dict[str, AIAnalysisResult]) -> str:
+    if not groups:
+        return ""
+    regions: dict[str, list[SourceReportGroup]] = {}
+    for group in groups:
+        regions.setdefault(group.region_label, []).append(group)
+
+    region_blocks = []
+    for region_label, region_groups in regions.items():
+        source_cards = "".join(_render_source_group_card(group, ai_results=ai_results) for group in region_groups)
+        region_blocks.append(
+            f"""
+            <section class="source-region-block">
+              <div class="source-region-header">
+                <h4 class="source-region-title">{_escape(region_label)}</h4>
+                <div class="section-count">{len(region_groups)} 个来源</div>
+              </div>
+              <div class="source-group-list">{source_cards}</div>
+            </section>
+            """
+        )
+
+    return f"""
+    <section class="section">
+      <div class="section-header">
+        <div class="section-heading">
+          <h3 class="section-title">按地区与来源查看</h3>
+          <p class="section-note">先按地区，再按来源查看本轮公告与聚合项目，保留原有 DIRECT / WATCHLIST / EXCLUDE 视图不变。</p>
+        </div>
+        <div class="section-count">{len(groups)} 个来源</div>
+      </div>
+      <div class="source-region-list">{"".join(region_blocks)}</div>
+    </section>
+    """
+
+
+def _render_source_group_card(group: SourceReportGroup, *, ai_results: dict[str, AIAnalysisResult]) -> str:
+    project_cards = "".join(
+        _render_project_card(item, compact=True, ai_result=ai_results.get(item.aggregation_key))
+        for item in group.items
+    )
+    return f"""
+    <details class="source-group-card">
+      <summary>
+        <div class="source-group-title">
+          <strong>{_escape(group.source_label)}</strong>
+          <span class="source-status {_escape_attr(group.source_status.lower())}">{_escape(group.source_status)}</span>
+        </div>
+        <div class="source-summary-grid">
+          {_fact("来源状态", group.source_status)}
+          {_fact("公告数量", str(group.notice_count))}
+          {_fact("DIRECT 数", str(group.tier_counts.get("DIRECT", 0)))}
+          {_fact("WATCHLIST 数", str(group.tier_counts.get("WATCHLIST", 0)))}
+          {_fact("EXCLUDE 数", str(group.tier_counts.get("EXCLUDE", 0)))}
+          {_fact("最近发布时间", _friendly_time(group.latest_publish_time))}
+        </div>
+      </summary>
+      <div class="source-project-list">{project_cards}</div>
+    </details>
+    """
+
+
 def _render_exclude_section(items: list[ProjectReportItem], *, ai_results: dict[str, AIAnalysisResult]) -> str:
     preview = "；".join(item.project_name for item in items[:5]) if items else TIER_EMPTY_HINTS["EXCLUDE"]
     body = (
@@ -1190,6 +1359,187 @@ def _source_label(notice: Notice) -> str:
     if source and subtype:
         return f"{source} / {subtype}"
     return source or subtype or "未提取到"
+
+
+def _region_label(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "地区未确认"
+    if "·" in raw:
+        parts = [part.strip() for part in raw.split("·") if part.strip()]
+        for part in parts:
+            if part.endswith(("市", "州", "地区", "盟")) and part not in {"湖南省"}:
+                raw = part
+                break
+        else:
+            raw = parts[0]
+    if raw.endswith("市") and len(raw) <= 4:
+        raw = raw[:-1]
+    return raw or "地区未确认"
+
+
+def _build_source_groups(notices: list[Notice], items: list[ProjectReportItem]) -> list[SourceReportGroup]:
+    catalog_lookup = _build_source_catalog_lookup()
+    grouped: dict[tuple[str, str], dict[str, object]] = {}
+
+    for notice in notices:
+        region_label = _group_region_for_notice(notice, catalog_lookup)
+        source_label = _source_label(notice)
+        bucket = grouped.setdefault(
+            (region_label, source_label),
+            {
+                "region_label": region_label,
+                "source_label": source_label,
+                "source_status": _source_status_for_notice(notice, catalog_lookup),
+                "notice_count": 0,
+                "project_count": 0,
+                "tier_counts": Counter(),
+                "latest_publish_time": "",
+                "items": [],
+            },
+        )
+        bucket["notice_count"] = int(bucket["notice_count"]) + 1
+        bucket["latest_publish_time"] = max(
+            str(bucket["latest_publish_time"]),
+            notice.publish_time or notice.notice_publish_time or "",
+        )
+
+    for item in items:
+        rep = item.representative
+        region_label = _group_region_for_notice(rep, catalog_lookup)
+        source_label = _source_label(rep)
+        bucket = grouped.setdefault(
+            (region_label, source_label),
+            {
+                "region_label": region_label,
+                "source_label": source_label,
+                "source_status": _source_status_for_notice(rep, catalog_lookup),
+                "notice_count": 0,
+                "project_count": 0,
+                "tier_counts": Counter(),
+                "latest_publish_time": item.latest_publish_time,
+                "items": [],
+            },
+        )
+        bucket["project_count"] = int(bucket["project_count"]) + 1
+        tier_counts = bucket["tier_counts"]
+        if isinstance(tier_counts, Counter):
+            tier_counts[item.project_tier] += 1
+        bucket_items = bucket["items"]
+        if isinstance(bucket_items, list):
+            bucket_items.append(item)
+        bucket["latest_publish_time"] = max(str(bucket["latest_publish_time"]), item.latest_publish_time)
+
+    groups = [
+        SourceReportGroup(
+            region_label=str(payload["region_label"]),
+            source_label=str(payload["source_label"]),
+            source_status=str(payload["source_status"]),
+            notice_count=int(payload["notice_count"]),
+            project_count=int(payload["project_count"]),
+            tier_counts={tier: int(count) for tier, count in dict(payload["tier_counts"]).items()},
+            latest_publish_time=str(payload["latest_publish_time"]),
+            items=sorted(
+                list(payload["items"]),
+                key=lambda item: (
+                    TIER_PRIORITY.get(item.project_tier, 9),
+                    -_sortable_datetime(item.latest_publish_time),
+                    item.project_name,
+                ),
+            ),
+        )
+        for payload in grouped.values()
+    ]
+    return sorted(
+        groups,
+        key=lambda group: (
+            -_sortable_datetime(group.latest_publish_time),
+            group.region_label,
+            group.source_label,
+        ),
+    )
+
+def _build_source_catalog_lookup() -> dict[tuple[str, str, str], dict[str, str]]:
+    try:
+        catalog = load_source_catalog()
+    except Exception:
+        return {}
+
+    lookup: dict[tuple[str, str, str], dict[str, str]] = {}
+    for source in catalog.get("sources") or []:
+        if not isinstance(source, dict):
+            continue
+        region = str(source.get("region") or "").strip()
+        source_name, subtype_name = _split_catalog_source_name(str(source.get("name") or "").strip())
+        if not source_name:
+            continue
+        status = str(source.get("status") or "").strip() or "unknown"
+        key = (
+            _normalize_text(region),
+            _normalize_text(source_name),
+            _normalize_source_subtype(subtype_name, region),
+        )
+        lookup[key] = {
+            "status": status,
+            "region": _region_label(region),
+        }
+    return lookup
+
+
+def _source_status_for_notice(notice: Notice, lookup: dict[tuple[str, str, str], dict[str, str]]) -> str:
+    source_info = _source_catalog_info_for_notice(notice, lookup)
+    if source_info:
+        return source_info.get("status", "unknown")
+    return "unknown"
+
+
+def _group_region_for_notice(notice: Notice, lookup: dict[tuple[str, str, str], dict[str, str]]) -> str:
+    raw_region = (notice.region or "").strip()
+    if raw_region and not raw_region.isdigit():
+        return _region_label(raw_region)
+    source_info = _source_catalog_info_for_notice(notice, lookup)
+    if source_info:
+        return source_info.get("region", "地区未确认")
+    return _region_label(raw_region)
+
+
+def _source_catalog_info_for_notice(
+    notice: Notice, lookup: dict[tuple[str, str, str], dict[str, str]]
+) -> dict[str, str] | None:
+    source = (notice.source or "").strip()
+    if not source:
+        return None
+    key = (
+        _normalize_text(_region_label(notice.region)),
+        _normalize_text(source),
+        _normalize_source_subtype(notice.source_subtype, notice.region),
+    )
+    source_info = lookup.get(key)
+    if source_info:
+        return source_info
+
+    for (_, source_name, subtype_name), candidate in lookup.items():
+        if source_name != _normalize_text(source):
+            continue
+        if subtype_name != _normalize_source_subtype(notice.source_subtype, notice.region):
+            continue
+        return candidate
+    return None
+
+
+def _split_catalog_source_name(value: str) -> tuple[str, str]:
+    source_name, _, subtype_name = value.partition(" / ")
+    return source_name.strip(), subtype_name.strip()
+
+
+def _normalize_source_subtype(value: str, region: str) -> str:
+    normalized = _normalize_text(value)
+    normalized_region = _normalize_text(region)
+    if normalized_region and normalized.startswith(normalized_region):
+        trimmed = normalized[len(normalized_region) :]
+        if trimmed:
+            return trimmed
+    return normalized
 
 
 def _format_amount_display(notice: Notice, *, field_name: str) -> str:
