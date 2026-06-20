@@ -1,0 +1,20 @@
+{
+  "code": 200,
+  "data": {
+    "governmentProcureAnnouncementInformation": [
+      {
+        "id": "fd2954cf-7b46-41bc-aace-cddb631aa360",
+        "bulletinType": "招标公告",
+        "noticeName": "长沙市雅礼中学（东塘校区）2026年家具类采购项目招标公告",
+        "noticeSendTime": "2026-06-16T15:08:24.000+08:00",
+        "bulletinBidNum": null,
+        "bulletinDuty": "湖南中投项目管理有限公司",
+        "governmentPurchaseSectionInformationId": "011a2f03-78f2-4ea0-af0f-630182744105",
+        "createTime": "2026-06-16T15:53:17.308+08:00",
+        "noticePath": null,
+        "filePath": null,
+        "noticeContent": "<div><p>项目概况：长沙市雅礼中学（东塘校区）2026年家具类采购项目的潜在投标人应在长沙公共资源交易电子服务平台获取招标文件，并于2026-07-08 09:00:00前提交投标文件。</p><p>一、项目基本情况</p><p>项目名称：长沙市雅礼中学（东塘校区）2026年家具类采购项目</p><p>采购方式：公开招标</p><p>预算金额：1233095.0</p><p>最高限价：1233095.0</p><p>采购需求：详见招标文件。</p><p>是否接受联合体：否</p><p><a href=\"/tradeApi/file/download?id=96b03ca2-a2c7-4066-b037-4c8bf9c37522\">采购文件.pdf</a></p></div>"
+      }
+    ]
+  }
+}

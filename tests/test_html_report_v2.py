@@ -118,6 +118,7 @@ class HtmlReportV2Tests(unittest.TestCase):
 
         self.assertIn("<details class=\"exclude-panel\"", html)
         self.assertIn("EXCLUDE 排除项", html)
+        self.assertNotIn("EXCLUDEEXCLUDE 排除项", html)
         self.assertIn("暂停公告", html)
         self.assertNotIn("https://cdn.", html)
         self.assertNotIn("node_modules", html.lower())
@@ -302,6 +303,131 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertNotIn('<details class="qualification-details">', html)
         self.assertNotIn("展开完整资质要求", html)
 
+    def test_report_renders_source_label_when_available(self) -> None:
+        notice = self._notice(
+            project_name="Changsha Project",
+            suffix="changsha-source",
+            lead_tier="EXCLUDE",
+            section_id="section-changsha-source",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.source = "长沙公共资源交易平台"
+        notice.source_subtype = "长沙政府采购交易"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("来源", html)
+        self.assertIn("长沙公共资源交易平台 / 长沙政府采购交易", html)
+
+    def test_report_uses_readable_link_label_when_employee_url_exists(self) -> None:
+        notice = self._notice(
+            project_name="Readable Link Project",
+            suffix="readable-link",
+            lead_tier="DIRECT",
+            section_id="section-readable-link",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("打开原文链接", html)
+        self.assertNotIn("打开原始接口", html)
+
+    def test_report_uses_raw_api_label_when_only_api_url_is_available(self) -> None:
+        notice = self._notice(
+            project_name="API Link Project",
+            suffix="api-link",
+            lead_tier="WATCHLIST",
+            section_id="section-api-link",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.employee_readable_url = ""
+        notice.original_url = ""
+        notice.raw_api_url = "https://example.com/raw-api"
+        notice.detail_available = True
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("打开原始接口", html)
+        self.assertNotIn("打开原文链接", html)
+
+    def test_report_treats_trade_api_in_original_url_as_api_link(self) -> None:
+        notice = self._notice(
+            project_name="Original API Link Project",
+            suffix="original-api-link",
+            lead_tier="WATCHLIST",
+            section_id="section-original-api-link",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.employee_readable_url = ""
+        notice.original_url = "https://example.com/tradeApi/project/detail?id=1"
+        notice.raw_api_url = ""
+        notice.detail_available = True
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("打开原始接口", html)
+        self.assertNotIn("打开原文链接", html)
+
+    def test_report_does_not_render_failed_api_as_primary_link(self) -> None:
+        notice = self._notice(
+            project_name="Failed API Project",
+            suffix="failed-api",
+            lead_tier="EXCLUDE",
+            section_id="section-failed-api",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.employee_readable_url = ""
+        notice.original_url = ""
+        notice.raw_api_url = "https://example.com/failed-api"
+        notice.detail_available = False
+        notice.detail_risk_note = "详情页不可访问或解析失败"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertNotIn('href="https://example.com/failed-api"', html)
+        self.assertIn("详情页不可访问或解析失败，建议人工到原站复核", html)
+        self.assertNotIn("打开原文链接", html)
+
+    def test_report_renders_quality_risk_panel_when_notice_has_risk_note(self) -> None:
+        notice = self._notice(
+            project_name="Quality Risk Project",
+            suffix="quality-risk",
+            lead_tier="WATCHLIST",
+            section_id="section-quality-risk",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 10:00:00",
+        )
+        notice.detail_risk_note = "列表新鲜度未证明，可能混入旧公告"
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(report_path, [notice], source_count=1, generated_at="2026-06-15 12:00:00")
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("数据质量提示", html)
+        self.assertIn("列表新鲜度未证明，可能混入旧公告", html)
+
 
     def test_company_profile_report_adds_four_zone_business_view(self) -> None:
         high = self._notice(
@@ -399,7 +525,7 @@ class CompanyBusinessZoneTests(unittest.TestCase):
             notice_title="Zone Project",
             notice_type="ZHAOBIAO_NOTICE",
             publish_time="2026-06-16 10:00:00",
-            bid_open_or_response_deadline="2026-06-20 09:00:00",
+            bid_open_or_response_deadline="2099-06-20 09:00:00",
             lead_tier="DIRECT",
         )
 

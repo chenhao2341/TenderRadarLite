@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from app.adapters.base import BaseAdapter
+from app.adapters.changsha_procurement import ChangshaProcurementAdapter
 from app.adapters.hengyang_construction import HengyangConstructionAdapter
 from app.adapters.hengyang_procurement import HengyangProcurementAdapter
 from app.adapters.registry import build_adapter, resolve_adapter_class
@@ -130,13 +131,13 @@ class AdapterFrameworkTests(unittest.TestCase):
         self.assertEqual(type(adapter).__name__, "HengyangConstructionAdapter")
 
     def test_real_adapters_expose_structured_pipeline_methods(self) -> None:
-        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter):
+        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter, ChangshaProcurementAdapter):
             self.assertIsNot(adapter_class.fetch_list, BaseAdapter.fetch_list)
             self.assertIsNot(adapter_class.fetch_detail, BaseAdapter.fetch_detail)
             self.assertIsNot(adapter_class.normalize, BaseAdapter.normalize)
 
     def test_real_adapters_support_structured_pipeline_detection(self) -> None:
-        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter):
+        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter, ChangshaProcurementAdapter):
             adapter = adapter_class(
                 source_name="demo",
                 url="https://example.com/list",

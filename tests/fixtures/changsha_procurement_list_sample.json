@@ -1,0 +1,28 @@
+{
+  "code": 200,
+  "data": {
+    "records": [
+      {
+        "fileId": null,
+        "bidOpeningSite": null,
+        "bidOpeningTime": null,
+        "purchaseProjectName": "（东塘校区）2026年家具类采购项目",
+        "projectId": "d6fe1726-8b47-4230-85e8-562dd090f4bb",
+        "purchaserMode": null,
+        "regionName": "长沙市",
+        "noticeName": "长沙市雅礼中学（东塘校区）2026年家具类采购项目招标公告",
+        "sections": 0,
+        "noticeSendTime": null,
+        "purchaserSource": null,
+        "tenderProjectType": "GOVERNMENT_PURCHASE",
+        "regionCode": "430100",
+        "purchaseSectionName": "（东塘校区）2026年家具类采购项目",
+        "isWarning": null,
+        "bidSectionId": "011a2f03-78f2-4ea0-af0f-630182744105",
+        "noticeType": "ZHAOBIAO_NOTICE",
+        "status": null,
+        "resourceState": null
+      }
+    ]
+  }
+}

@@ -46,6 +46,27 @@ sources:
     source_from: native
     reference_project: native_config_sources_json
     license_note: Native adapter only. No third-party code reuse.
+  - id: changsha-procurement
+    name: 长沙公共资源交易平台 / 政府采购交易
+    homepage: https://changsha.hnsggzy.com/
+    list_entry_url: https://changsha.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430100&current=1&size=10&descs=noticeSendTime&notice=1&tenderMode=%E5%85%AC%E5%BC%80%E6%8B%9B%E6%A0%87
+    region: 长沙
+    source_type: government_procurement
+    supported_notice_types: ["招标公告"]
+    adapter: app.adapters.changsha_procurement
+    status: alpha
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: yes
+    has_attachments: likely
+    access_risk: low
+    anti_bot_risk: low
+    login_requirement: no
+    data_quality: medium
+    update_frequency: frequent
+    notes: requests 明文 JSON 已验证；当前列表入口需显式带上前端真实过滤参数 `descs=noticeSendTime&notice=1&tenderMode=公开招标`，并在详情侧按列表公告类型回退选择匹配的招标公告，才能避免旧公告与更正公告污染；已验证可读前端详情页；附件只做发现和元数据保留，不下载、不解析；默认保持 enabled=false，当前仍为 alpha。
+    source_from: native
+    reference_project: P1-3A changsha procurement alpha
+    license_note: Native adapter only. No third-party code reuse.
   - id: china-government-procurement
     name: 中国政府采购网
     homepage: https://www.ccgp.gov.cn/

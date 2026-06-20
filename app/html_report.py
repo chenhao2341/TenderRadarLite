@@ -425,6 +425,17 @@ def build_html_report(
       letter-spacing: 0.05em;
       white-space: nowrap;
     }}
+    .sr-only {{
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }}
     .tier-badge.direct {{ color: var(--direct); background: var(--direct-soft); }}
     .tier-badge.watchlist {{ color: var(--watch); background: var(--watch-soft); }}
     .tier-badge.exclude {{ color: var(--exclude); background: var(--exclude-soft); }}
@@ -1076,6 +1087,7 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
     qualification_summary = _truncate(item.qualification_summary, 320 if not compact else 220)
     content_source = _render_summary_source("项目内容摘要来源", item.content_summary_source_label)
     qualification_source = _render_summary_source("资质要求摘要来源", item.qualification_summary_source_label)
+    quality_risk_panel = _render_quality_risk_panel(rep)
     return f"""
     <article class="project-card">
       <div class="project-top">
@@ -1083,10 +1095,11 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
           <h4 class="project-title">【{_escape(item.project_tier)}】{_escape(item.project_name)}</h4>
           <p class="project-subtitle">关联公告 {item.notice_count} 条 · 最近发布时间 {_escape(_friendly_time(item.latest_publish_time))}</p>
         </div>
-        <span class="tier-badge {_escape_attr(item.project_tier.lower())}"><span class="tier-code">{_escape(item.project_tier)}</span><span class="tier-text">{_escape(TIER_LABELS[item.project_tier])}</span></span>
+        <span class="tier-badge {_escape_attr(item.project_tier.lower())}"><span class="sr-only">{_escape(item.project_tier)}</span>{_escape(TIER_LABELS[item.project_tier])}</span>
       </div>
       <div class="fact-grid">
         {_fact("商机阶段", opportunity_stage_label(rep.opportunity_stage))}
+        {_fact("来源", _source_label(rep))}
         {_fact("地区", rep.region or "未提取到")}
         {_fact("关联公告类型", "、".join(item.notice_labels) or "未提取到")}
         {_fact("招标人或采购单位", rep.purchaser_or_tenderer or "未提取到")}
@@ -1123,6 +1136,7 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
         {_render_qualification_panel(item, compact=compact)}
       </div>
       {attachment_panel}
+      {quality_risk_panel}
       {_render_ai_panel(ai_result)}
       <div class="project-actions">
         {_render_link_button(rep)}
@@ -1133,14 +1147,49 @@ def _render_project_card(item: ProjectReportItem, *, compact: bool = False, ai_r
 
 
 def _render_link_button(notice: Notice) -> str:
-    link_url = notice.employee_readable_url or notice.original_url or notice.raw_api_url or ""
-    if not link_url:
-        return '<span class="action-note">未提供原文链接</span>'
-    return f'<a class="link-button" href="{_escape_attr(link_url)}" target="_blank" rel="noreferrer">打开原文链接</a>'
+    readable_url = ""
+    for candidate in [notice.employee_readable_url, notice.original_url]:
+        if candidate and not _looks_like_api_url(candidate):
+            readable_url = candidate
+            break
+    if readable_url:
+        return (
+            f'<a class="link-button" href="{_escape_attr(readable_url)}" target="_blank" rel="noreferrer">'
+            "打开原文链接"
+            "</a>"
+        )
+    api_url = notice.raw_api_url or ""
+    if not api_url:
+        for candidate in [notice.employee_readable_url, notice.original_url]:
+            if candidate and _looks_like_api_url(candidate):
+                api_url = candidate
+                break
+    if notice.detail_available and api_url:
+        return (
+            f'<a class="link-button" href="{_escape_attr(api_url)}" target="_blank" rel="noreferrer">'
+            "打开原始接口"
+            "</a>"
+        )
+    if notice.detail_risk_note:
+        return f'<span class="action-note">{_escape(notice.detail_risk_note)}，建议人工到原站复核</span>'
+    return '<span class="action-note">可读原文链接未确认</span>'
+
+
+def _looks_like_api_url(value: str) -> bool:
+    compact = (value or "").strip().lower()
+    return "/tradeapi/" in compact or compact.endswith(".json")
 
 
 def _fact(label: str, value: str) -> str:
     return f'<div class="fact"><strong>{_escape(label)}</strong><span>{_escape(value)}</span></div>'
+
+
+def _source_label(notice: Notice) -> str:
+    source = (notice.source or "").strip()
+    subtype = (notice.source_subtype or "").strip()
+    if source and subtype:
+        return f"{source} / {subtype}"
+    return source or subtype or "未提取到"
 
 
 def _format_amount_display(notice: Notice, *, field_name: str) -> str:
@@ -1243,6 +1292,18 @@ def _render_attachment_panel(notice: Notice) -> str:
     <section class="signal-card">
       <strong>详情/附件</strong>
       {"".join(lines)}
+    </section>
+    """
+
+
+def _render_quality_risk_panel(notice: Notice) -> str:
+    risk_note = (notice.detail_risk_note or "").strip()
+    if not risk_note:
+        return ""
+    return f"""
+    <section class="signal-card">
+      <strong>数据质量提示</strong>
+      <p>{_escape(risk_note)}</p>
     </section>
     """
 

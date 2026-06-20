@@ -1,0 +1,64 @@
+{
+  "code": 200,
+  "data": {
+    "governmentProcurementProjectInformation": {
+      "id": "d6fe1726-8b47-4230-85e8-562dd090f4bb",
+      "purchaseProjectName": "（东塘校区）2026年家具类采购项目",
+      "purchaseProjectCode": "（东塘校区）2026年家具类采购项目",
+      "investProjectCode": null,
+      "regionCode": "430100",
+      "tenderProjectType": "货物类",
+      "purchaserName": "长沙市雅礼中学",
+      "purchaserCode": "12430100444906962M",
+      "purchaserAgencyName": "湖南中投项目管理有限公司",
+      "purchaserAgencyCode": "12430100444906962M",
+      "purchaserAgencyConnector": "杨丹华",
+      "purchaserAgencyInformation": "0731-82255989",
+      "superviseDeptName": "市采购局",
+      "programBudget": "1233095.0",
+      "purchaserMode": "公开招标",
+      "purchaserContent": null,
+      "purchaserOrganizeForm": "委托招标",
+      "qualType": null,
+      "isProject": "否",
+      "preferentialPolicyType": null,
+      "purchaserPlanningId": null,
+      "purchaserSource": "政府采购"
+    },
+    "GovernmentProcureSectionInformationList": [
+      {
+        "id": "011a2f03-78f2-4ea0-af0f-630182744105",
+        "unifiedDealCode": "D01-12430100448804672D-20260616-000003-3",
+        "purchaseSectionCode": "CSCG20260467",
+        "purchaseSectionName": "（东塘校区）2026年家具类采购项目",
+        "sectionBudget": "1233095.0",
+        "controlPrice": null,
+        "tenderType": "公开招标",
+        "purchaseQualification": "详见招标文件",
+        "purchaseSectionContent": "详见招标文件",
+        "governmentPurchasementProjectInformationId": "d6fe1726-8b47-4230-85e8-562dd090f4bb",
+        "announcementInformationId": "fd2954cf-7b46-41bc-aace-cddb631aa360;011a2f03-78f2-4ea0-af0f-630182744105",
+        "resultAnnouncementInformationId": null,
+        "projectType": "货物类",
+        "linkKey": "noticeInfo",
+        "regionCode": "430100",
+        "evaluateLabel": null,
+        "evaluateStatus": 0,
+        "evaluateReportTxt": null,
+        "zhaobiaofangshi": "公开招标",
+        "isRemoteEvaluation": "否",
+        "planningId": null,
+        "dataFrom": "新点接口对接",
+        "resourceState": null
+      }
+    ],
+    "GovernmentPurchaseFile": [
+      {
+        "fileId": "96b03ca2-a2c7-4066-b037-4c8bf9c37522",
+        "fileNo": "CSCG20260467-01Z01",
+        "governmentPurchasementProjectInformationId": "d6fe1726-8b47-4230-85e8-562dd090f4bb",
+        "regionCode": "430100"
+      }
+    ]
+  }
+}

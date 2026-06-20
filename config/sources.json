@@ -20,5 +20,17 @@
     "enabled": true,
     "url": "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430400&current=1&size=10",
     "region": "衡阳"
+  },
+  {
+    "name": "Changsha Procurement",
+    "source": "长沙公共资源交易平台",
+    "source_subtype": "长沙政府采购交易",
+    "module": "app.adapters.changsha_procurement",
+    "class": "ChangshaProcurementAdapter",
+    "enabled": false,
+    "url": "https://changsha.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430100&current=1&size=10",
+    "region": "长沙",
+    "pages_scanned": 1,
+    "page_size": 10
   }
 ]
