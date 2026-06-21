@@ -131,6 +131,7 @@ class AdapterBehaviorTests(unittest.TestCase):
         list_url = (
             "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/"
             "projectInformation/selectAll?regionCode=430400&current=1&size=10"
+            "&descs=noticeSendTime&notice=1&tenderMode=%E5%85%AC%E5%BC%80%E6%8B%9B%E6%A0%87"
         )
         section_id = "sec-1"
         project_url = (
@@ -230,7 +231,11 @@ class AdapterBehaviorTests(unittest.TestCase):
         self.assertEqual(notice.budget_amount_unit, "万元")
         self.assertEqual(notice.ceiling_price, "90")
         self.assertEqual(notice.ceiling_price_unit, "元")
-        self.assertEqual(notice.original_url, ann_url)
+        self.assertEqual(
+            notice.original_url,
+            "https://hengyang.hnsggzy.com/#/resources/projectDetail/governmentPurchase?id=proj-1&regionCode=430400&bidSectionId=sec-1&default=projectInfo",
+        )
+        self.assertEqual(notice.employee_readable_url, notice.original_url)
         self.assertEqual(notice.raw_api_url, ann_url)
         self.assertTrue(notice.detail_checked)
         self.assertTrue(notice.detail_available)
@@ -245,6 +250,7 @@ class AdapterBehaviorTests(unittest.TestCase):
         list_url = (
             "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/"
             "projectInformation/selectAll?regionCode=430400&current=1&size=10"
+            "&descs=noticeSendTime&notice=1&tenderMode=%E5%85%AC%E5%BC%80%E6%8B%9B%E6%A0%87"
         )
         project_url_1 = (
             "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/"
@@ -359,6 +365,7 @@ class AdapterBehaviorTests(unittest.TestCase):
         list_url = (
             "https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/"
             "projectInformation/selectAll?regionCode=430400&current=1&size=10"
+            "&descs=noticeSendTime&notice=1&tenderMode=%E5%85%AC%E5%BC%80%E6%8B%9B%E6%A0%87"
         )
         section_id = "sec-unavailable"
         project_url = (

@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..amount_utils import RAW_TEXT_SOURCE, parse_amount_context
 from ..attachment_utils import apply_attachment_result, discover_attachments
 from ..html_extract import html_to_text
 from ..models import Notice
 from .base import BaseAdapter
-from .hengyang_trade_utils import base_origin, summarize_notice_html
+from .hengyang_trade_utils import base_origin, build_paged_url, summarize_notice_html
+
+
+LIST_DEFAULT_PARAMS = {
+    "descs": "noticeSendTime",
+    "notice": "1",
+    "tenderMode": "公开招标",
+}
 
 
 class HengyangProcurementAdapter(BaseAdapter):
     def fetch_list(self) -> list[dict[str, Any]]:
-        payload = self.fetcher.get_json(self.url) or {}
+        payload = self.fetcher.get_json(_build_hengyang_list_url(self.url)) or {}
         records = ((payload.get("data") or {}).get("records")) or []
         self._list_stats = {
             "fetched_total": len(records),
@@ -29,6 +37,16 @@ class HengyangProcurementAdapter(BaseAdapter):
         project_payload = self.fetcher.get_json(
             f"{origin}/tradeApi/governmentPurchase/projectInformation/getBySectionId?sectionId={section_id}"
         ) or {}
+        project_detail = project_payload.get("data") or {}
+        project_info = project_detail.get("governmentProcurementProjectInformation") or {}
+        employee_url = _build_employee_readable_url(
+            origin=origin,
+            project_id=str(item.get("projectId") or ""),
+            region_code=str(
+                item.get("regionCode") or project_info.get("regionCode") or self.source_config.get("region_code") or ""
+            ),
+            section_id=section_id,
+        )
         raw_api_url = (
             f"{origin}/tradeApi/governmentPurchase/projectInformation/getAnnouncementBySectionId"
             f"?sectionId={section_id}"
@@ -40,7 +58,8 @@ class HengyangProcurementAdapter(BaseAdapter):
             return {
                 "detail_checked": True,
                 "detail_available": False,
-                "detail": project_payload.get("data") or {},
+                "detail": project_detail,
+                "employee_url": employee_url,
                 "raw_api_url": raw_api_url,
                 "structured_attachments": ((project_payload.get("data") or {}).get("GovernmentPurchaseFile")) or [],
                 "detail_risk_note": "详情页不可访问或解析失败",
@@ -49,7 +68,8 @@ class HengyangProcurementAdapter(BaseAdapter):
         return {
             "detail_checked": True,
             "detail_available": True,
-            "detail": project_payload.get("data") or {},
+            "detail": project_detail,
+            "employee_url": employee_url,
             "announcement": ann_list[0],
             "raw_api_url": raw_api_url,
             "structured_attachments": ((project_payload.get("data") or {}).get("GovernmentPurchaseFile")) or [],
@@ -104,8 +124,8 @@ class HengyangProcurementAdapter(BaseAdapter):
             content_summary=content_summary,
             qualification_summary=qualification_summary,
             accepts_consortium=consortium,
-            original_url=str((detail or {}).get("raw_api_url") or ""),
-            employee_readable_url="",
+            original_url=str((detail or {}).get("employee_url") or ""),
+            employee_readable_url=str((detail or {}).get("employee_url") or ""),
             raw_api_url=str((detail or {}).get("raw_api_url") or ""),
             fetched_at=self.now_string(),
         )
@@ -164,3 +184,32 @@ def _stringify_number(value: Any) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _build_hengyang_list_url(url: str, *, current: int = 1, size: int = 10) -> str:
+    paged_url = build_paged_url(url, current=current, size=size)
+    parts = urlsplit(paged_url)
+    query_items = dict(parse_qsl(parts.query, keep_blank_values=True))
+    for key, value in LIST_DEFAULT_PARAMS.items():
+        query_items.setdefault(key, value)
+    return urlunsplit(parts._replace(query=urlencode(query_items)))
+
+
+def _build_employee_readable_url(
+    *,
+    origin: str,
+    project_id: str,
+    region_code: str,
+    section_id: str,
+) -> str:
+    if not origin or not section_id:
+        return ""
+    query = urlencode(
+        {
+            "id": project_id,
+            "regionCode": region_code,
+            "bidSectionId": section_id,
+            "default": "projectInfo",
+        }
+    )
+    return f"{origin}/#/resources/projectDetail/governmentPurchase?{query}"
