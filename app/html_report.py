@@ -83,6 +83,13 @@ class SourceReportGroup:
     items: list[ProjectReportItem]
 
 
+SOURCE_STATUS_LABELS = {
+    "supported": "supported",
+    "alpha": "alpha",
+    "unknown": "unknown",
+}
+
+
 def write_html_report(
     path: Path,
     notices: Iterable[Notice],
@@ -1185,6 +1192,7 @@ def _render_region_source_section(groups: list[SourceReportGroup], *, ai_results
 
 
 def _render_source_group_card(group: SourceReportGroup, *, ai_results: dict[str, AIAnalysisResult]) -> str:
+    status_label = _display_source_status(group.source_status)
     project_cards = "".join(
         _render_project_card(item, compact=True, ai_result=ai_results.get(item.aggregation_key))
         for item in group.items
@@ -1194,10 +1202,10 @@ def _render_source_group_card(group: SourceReportGroup, *, ai_results: dict[str,
       <summary>
         <div class="source-group-title">
           <strong>{_escape(group.source_label)}</strong>
-          <span class="source-status {_escape_attr(group.source_status.lower())}">{_escape(group.source_status)}</span>
+          <span class="source-status {_escape_attr(status_label)}">{_escape(status_label)}</span>
         </div>
         <div class="source-summary-grid">
-          {_fact("来源状态", group.source_status)}
+          {_fact("来源状态", status_label)}
           {_fact("公告数量", str(group.notice_count))}
           {_fact("DIRECT 数", str(group.tier_counts.get("DIRECT", 0)))}
           {_fact("WATCHLIST 数", str(group.tier_counts.get("WATCHLIST", 0)))}
@@ -1489,7 +1497,7 @@ def _build_source_catalog_lookup() -> dict[tuple[str, str, str], dict[str, str]]
 def _source_status_for_notice(notice: Notice, lookup: dict[tuple[str, str, str], dict[str, str]]) -> str:
     source_info = _source_catalog_info_for_notice(notice, lookup)
     if source_info:
-        return source_info.get("status", "unknown")
+        return _display_source_status(source_info.get("status", "unknown"))
     return "unknown"
 
 
@@ -1530,6 +1538,11 @@ def _source_catalog_info_for_notice(
 def _split_catalog_source_name(value: str) -> tuple[str, str]:
     source_name, _, subtype_name = value.partition(" / ")
     return source_name.strip(), subtype_name.strip()
+
+
+def _display_source_status(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    return SOURCE_STATUS_LABELS.get(normalized, "unknown")
 
 
 def _normalize_source_subtype(value: str, region: str) -> str:

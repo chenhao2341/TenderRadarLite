@@ -32,5 +32,17 @@
     "region": "长沙",
     "pages_scanned": 1,
     "page_size": 10
+  },
+  {
+    "name": "China Government Procurement Local",
+    "source": "中国政府采购网",
+    "source_subtype": "地方公告",
+    "module": "app.adapters.ccgp_local",
+    "class": "CcgpLocalAdapter",
+    "enabled": false,
+    "url": "https://www.ccgp.gov.cn/cggg/dfgg/",
+    "region": "全国",
+    "pages_scanned": 1,
+    "page_size": 20
   }
 ]

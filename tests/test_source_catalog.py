@@ -18,7 +18,7 @@ class SourceCatalogTests(unittest.TestCase):
         catalog = load_source_catalog()
 
         self.assertEqual(validate_source_catalog(catalog), [])
-        self.assertEqual(len(catalog["sources"]), 19)
+        self.assertEqual(len(catalog["sources"]), 20)
 
     def test_every_source_id_is_unique(self) -> None:
         catalog = load_source_catalog()
@@ -65,7 +65,7 @@ class SourceCatalogTests(unittest.TestCase):
         grouped = group_sources_by_status(catalog)
 
         self.assertEqual(len(grouped["supported"]), 2)
-        self.assertEqual(len(grouped["alpha"]), 1)
+        self.assertEqual(len(grouped["alpha"]), 2)
         self.assertEqual(len(grouped["candidate"]), 6)
         self.assertEqual(len(grouped["planned"]), 6)
         self.assertEqual(len(grouped["blocked"]), 4)
@@ -73,6 +73,7 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(supported_ids, {"hengyang-construction", "hengyang-procurement"})
         self.assertEqual(find_source_by_id(catalog, "china-government-procurement")["status"], "candidate")
         self.assertEqual(find_source_by_id(catalog, "changsha-procurement")["status"], "alpha")
+        self.assertEqual(find_source_by_id(catalog, "china-government-procurement-local")["status"], "alpha")
 
     def test_github_reference_sources_cannot_be_marked_supported(self) -> None:
         catalog = load_source_catalog()
@@ -90,10 +91,10 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(
             summary,
             {
-                "total": 19,
+                "total": 20,
                 "by_status": {
                     "supported": 2,
-                    "alpha": 1,
+                    "alpha": 2,
                     "candidate": 6,
                     "planned": 6,
                     "blocked": 4,

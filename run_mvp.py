@@ -1,6 +1,11 @@
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv as _load_dotenv
+except ModuleNotFoundError:
+    def _load_dotenv(*args, **kwargs):
+        return False
 
-load_dotenv()
+
+_load_dotenv()
 
 from app.main import main
 

@@ -67,6 +67,27 @@ sources:
     source_from: native
     reference_project: P1-3A changsha procurement alpha
     license_note: Native adapter only. No third-party code reuse.
+  - id: china-government-procurement-local
+    name: 中国政府采购网 / 地方公告
+    homepage: https://www.ccgp.gov.cn/
+    list_entry_url: https://www.ccgp.gov.cn/cggg/dfgg/
+    region: 全国
+    source_type: government_procurement
+    supported_notice_types: ["公开招标", "竞争性磋商", "竞争性谈判", "中标公告", "更正公告"]
+    adapter: app.adapters.ccgp_local
+    status: alpha
+    industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
+    has_detail_page: yes
+    has_attachments: likely
+    access_risk: medium
+    anti_bot_risk: medium
+    login_requirement: no
+    data_quality: medium
+    update_frequency: frequent
+    notes: 列表为 HTML；详情为 HTML；默认 requests UA 会触发 403，需固定浏览器型请求头；字段完整度依赖详情页和公告类型；附件只做发现；首版 pages_scanned=1；默认 enabled=false；当前为 alpha。
+    source_from: native
+    reference_project: P1-3D-A ccgp local alpha
+    license_note: Native adapter only. No third-party code reuse.
   - id: china-government-procurement
     name: 中国政府采购网
     homepage: https://www.ccgp.gov.cn/

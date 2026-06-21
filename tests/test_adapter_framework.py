@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import unittest
+import importlib.util
+from pathlib import Path
 from unittest import mock
 
 from app.adapters.base import BaseAdapter
+from app.adapters.ccgp_local import CcgpLocalAdapter
 from app.adapters.changsha_procurement import ChangshaProcurementAdapter
 from app.adapters.hengyang_construction import HengyangConstructionAdapter
 from app.adapters.hengyang_procurement import HengyangProcurementAdapter
@@ -131,13 +134,23 @@ class AdapterFrameworkTests(unittest.TestCase):
         self.assertEqual(type(adapter).__name__, "HengyangConstructionAdapter")
 
     def test_real_adapters_expose_structured_pipeline_methods(self) -> None:
-        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter, ChangshaProcurementAdapter):
+        for adapter_class in (
+            HengyangConstructionAdapter,
+            HengyangProcurementAdapter,
+            ChangshaProcurementAdapter,
+            CcgpLocalAdapter,
+        ):
             self.assertIsNot(adapter_class.fetch_list, BaseAdapter.fetch_list)
             self.assertIsNot(adapter_class.fetch_detail, BaseAdapter.fetch_detail)
             self.assertIsNot(adapter_class.normalize, BaseAdapter.normalize)
 
     def test_real_adapters_support_structured_pipeline_detection(self) -> None:
-        for adapter_class in (HengyangConstructionAdapter, HengyangProcurementAdapter, ChangshaProcurementAdapter):
+        for adapter_class in (
+            HengyangConstructionAdapter,
+            HengyangProcurementAdapter,
+            ChangshaProcurementAdapter,
+            CcgpLocalAdapter,
+        ):
             adapter = adapter_class(
                 source_name="demo",
                 url="https://example.com/list",
@@ -146,6 +159,45 @@ class AdapterFrameworkTests(unittest.TestCase):
                 source_config={"name": "demo", "source_type": "demo"},
             )
             self.assertTrue(adapter._uses_structured_pipeline())
+
+    def test_run_mvp_module_can_load_without_python_dotenv(self) -> None:
+        module_path = Path("D:/TenderRadarLite/run_mvp.py")
+        spec = importlib.util.spec_from_file_location("run_mvp_missing_dotenv_test", module_path)
+        self.assertIsNotNone(spec)
+        module = importlib.util.module_from_spec(spec)
+        real_import = __import__
+
+        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "dotenv":
+                raise ModuleNotFoundError("No module named 'dotenv'")
+            return real_import(name, globals, locals, fromlist, level)
+
+        with mock.patch("builtins.__import__", side_effect=fake_import):
+            assert spec.loader is not None
+            spec.loader.exec_module(module)
+
+        self.assertTrue(callable(module.main))
+
+    def test_local_html_entrypoint_keeps_feishu_and_ai_disabled_by_default(self) -> None:
+        from app.main import main
+
+        with (
+            mock.patch("app.main.run_once", return_value=[] ) as run_once,
+            mock.patch("app.main._print_run_results"),
+            mock.patch("app.main._return_code_for_run", return_value=0),
+            mock.patch("app.main.html_report_path", return_value=Path("D:/TenderRadarLite/reports/latest.html")),
+        ):
+            exit_code = main(["--local-html"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            run_once.call_args.kwargs,
+            {
+                "enable_feishu": False,
+                "html_report": True,
+                "profile_id": "design_consulting",
+            },
+        )
 
 
 if __name__ == "__main__":

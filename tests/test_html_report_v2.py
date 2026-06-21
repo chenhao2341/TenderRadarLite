@@ -376,12 +376,24 @@ class HtmlReportV2Tests(unittest.TestCase):
         changsha_exclude.source_subtype = "长沙政府采购交易"
         changsha_exclude.region = "长沙"
 
+        ccgp_local_notice = self._notice(
+            project_name="CCGP Local Project",
+            suffix="ccgp-local",
+            lead_tier="WATCHLIST",
+            section_id="section-ccgp-local",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-16 09:00:00",
+        )
+        ccgp_local_notice.source = "\u4e2d\u56fd\u653f\u5e9c\u91c7\u8d2d\u7f51"
+        ccgp_local_notice.source_subtype = "\u5730\u65b9\u516c\u544a"
+        ccgp_local_notice.region = "\u5c71\u4e1c"
+
         with tempfile.TemporaryDirectory() as raw_dir:
             report_path = Path(raw_dir) / "latest.html"
             write_html_report(
                 report_path,
-                [hengyang_construction, hengyang_procurement, changsha_direct, changsha_exclude],
-                source_count=3,
+                [hengyang_construction, hengyang_procurement, changsha_direct, changsha_exclude, ccgp_local_notice],
+                source_count=4,
                 generated_at="2026-06-17 12:00:00",
             )
             html = report_path.read_text(encoding="utf-8")
@@ -392,6 +404,12 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertIn("DIRECT 直接商机", html)
         self.assertIn("WATCHLIST 待复核", html)
         self.assertIn("EXCLUDE 排除项", html)
+        self.assertNotIn("supported \u6709", html)
+        self.assertNotIn("alpha \u963f\u5c14\u6cd5", html)
+        self.assertNotIn("DIRECT \u6570 \u76f4\u63a5\u6570", html)
+        self.assertNotIn("WATCHLIST \u6570 \u5173\u6ce8\u5217\u8868\u6570\u91cf", html)
+        self.assertNotIn("EXCLUDE \u6570 \u6392\u9664\u6570\u5b57", html)
+
 
         construction_slice = self._source_group_slice(html, "衡阳分平台 / 建设工程交易")
         self.assertIn(">supported<", construction_slice)
@@ -409,6 +427,13 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertIn("DIRECT 数</strong><span>1</span>", changsha_slice)
         self.assertIn("EXCLUDE 数</strong><span>1</span>", changsha_slice)
         self.assertIn("最近发布时间</strong><span>2026-06-17 10:00:00</span>", changsha_slice)
+
+        ccgp_local_slice = self._source_group_slice(
+            html, "\u4e2d\u56fd\u653f\u5e9c\u91c7\u8d2d\u7f51 / \u5730\u65b9\u516c\u544a"
+        )
+        self.assertIn(">alpha<", ccgp_local_slice)
+        self.assertIn("\u516c\u544a\u6570\u91cf</strong><span>1</span>", ccgp_local_slice)
+        self.assertIn("WATCHLIST \u6570</strong><span>1</span>", ccgp_local_slice)
 
     def test_report_groups_unknown_region_and_missing_subtype_conservatively(self) -> None:
         unknown_region_notice = self._notice(
