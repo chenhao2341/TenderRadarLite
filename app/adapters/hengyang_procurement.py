@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -16,6 +17,29 @@ LIST_DEFAULT_PARAMS = {
     "notice": "1",
     "tenderMode": "公开招标",
 }
+DEADLINE_LABELS = [
+    "提交投标文件的截止时间",
+    "提交投标文件截止时间",
+    "投标截止时间",
+    "开标时间",
+    "响应文件提交截止时间",
+    "响应文件开启时间",
+    "提交响应文件截止时间",
+    "递交投标文件截止时间",
+    "递交响应文件截止时间",
+    "截止时间",
+]
+REGION_CODE_FALLBACKS = {
+    "430400": "衡阳市",
+}
+ATTACHMENT_LIMIT_NOTE = "附件仅做发现，未下载或解析"
+TENDER_NOTICE_KEYWORDS = ("招标", "采购", "磋商", "谈判", "询价")
+RELAXED_NOTICE_KEYWORDS = ("中标", "成交", "结果", "更正", "澄清", "暂停", "终止", "废标", "流标")
+DATETIME_RE_LIST = [
+    re.compile(r"(20\d{2}[年\-/\.]\d{1,2}[月\-/\.]\d{1,2}日?\s*\d{1,2}[:：]\d{2}(?::\d{2})?)"),
+    re.compile(r"(20\d{2}[年\-/\.]\d{1,2}[月\-/\.]\d{1,2}日?\s*\d{1,2}时\d{1,2}分(?:\d{1,2}秒)?)"),
+    re.compile(r"(20\d{2}[年\-/\.]\d{1,2}[月\-/\.]\d{1,2}日?)"),
+]
 
 
 class HengyangProcurementAdapter(BaseAdapter):
@@ -86,6 +110,14 @@ class HengyangProcurementAdapter(BaseAdapter):
         notice_html = ann.get("noticeContent") or ""
         notice_text = html_to_text(notice_html)
         content_summary, qualification_summary, deadline, consortium = summarize_notice_html(notice_html)
+        deadline = _extract_hengyang_deadline(
+            item=item,
+            project=project,
+            section=section,
+            announcement=ann,
+            notice_text=notice_text,
+            fallback_deadline=deadline,
+        )
         budget_context = parse_amount_context(
             _stringify_number(project.get("programBudget") or section.get("sectionBudget")),
             text_sources=[(RAW_TEXT_SOURCE, notice_text)],
@@ -108,7 +140,10 @@ class HengyangProcurementAdapter(BaseAdapter):
             project_code=(project.get("purchaseProjectCode") or item.get("projectId") or "").strip(),
             purchaser_or_tenderer=(project.get("purchaserName") or "").strip(),
             agency=(project.get("purchaserAgencyName") or "").strip(),
-            region=(project.get("regionCode") or item.get("regionName") or self.region).strip(),
+            region=_normalize_hengyang_region(
+                item.get("regionName") or project.get("regionName") or project.get("regionCode") or item.get("regionCode"),
+                fallback=self.region,
+            ),
             publish_time=(ann.get("noticeSendTime") or item.get("noticeSendTime") or "").strip(),
             file_get_deadline=deadline if "截止" in deadline else "",
             bid_open_or_response_deadline=deadline,
@@ -140,11 +175,13 @@ class HengyangProcurementAdapter(BaseAdapter):
                 detail_risk_note=(detail or {}).get("detail_risk_note"),
             ),
         )
+        notice.detail_risk_note = _build_quality_risk_note(notice, detail)
         return notice
 
     def crawl(self) -> list[Notice]:
         notices: list[Notice] = []
         detail_success = 0
+        detail_partial = 0
         skipped = 0
         inaccessible_count = 0
 
@@ -162,6 +199,8 @@ class HengyangProcurementAdapter(BaseAdapter):
             notices.append(notice)
             if notice.detail_available:
                 detail_success += 1
+                if _notice_has_partial_gap(notice):
+                    detail_partial += 1
             else:
                 inaccessible_count += 1
 
@@ -169,6 +208,8 @@ class HengyangProcurementAdapter(BaseAdapter):
         self.last_crawl_stats = {
             "list_count": list_stats.get("fetched_total", 0),
             "detail_success_count": detail_success,
+            "detail_partial_count": detail_partial,
+            "detail_failed_count": inaccessible_count,
             "skipped_count": skipped,
             "real_notice_count": len(notices),
             "fetch_failed": list_stats.get("fetch_failed", 0),
@@ -213,3 +254,120 @@ def _build_employee_readable_url(
         }
     )
     return f"{origin}/#/resources/projectDetail/governmentPurchase?{query}"
+
+
+def _normalize_hengyang_region(value: Any, *, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    if text and not text.isdigit():
+        return text
+    fallback_text = str(fallback or "").strip()
+    mapped = REGION_CODE_FALLBACKS.get(text) or REGION_CODE_FALLBACKS.get(fallback_text)
+    if mapped:
+        return mapped
+    if fallback_text and not fallback_text.isdigit():
+        return fallback_text
+    return fallback_text or text or "衡阳市"
+
+
+def _extract_hengyang_deadline(
+    *,
+    item: dict[str, Any],
+    project: dict[str, Any],
+    section: dict[str, Any],
+    announcement: dict[str, Any],
+    notice_text: str,
+    fallback_deadline: str,
+) -> str:
+    for candidate in (
+        announcement.get("bidOpeningTime"),
+        announcement.get("openBidTime"),
+        announcement.get("responseFileSubmitTime"),
+        announcement.get("responseFileOpenTime"),
+        section.get("bidOpeningTime"),
+        section.get("responseFileSubmitTime"),
+        item.get("bidOpeningTime"),
+        item.get("responseFileSubmitTime"),
+        fallback_deadline,
+    ):
+        cleaned = _normalize_deadline_text(candidate)
+        if cleaned:
+            return cleaned
+    return _extract_deadline_from_text(notice_text)
+
+
+def _extract_deadline_from_text(text: str) -> str:
+    cleaned_text = str(text or "")
+    for label in DEADLINE_LABELS:
+        idx = cleaned_text.find(label)
+        if idx == -1:
+            continue
+        snippet = cleaned_text[idx : idx + 160]
+        extracted = _extract_datetime_from_snippet(snippet)
+        if extracted:
+            return extracted
+    for pattern in DATETIME_RE_LIST:
+        for match in pattern.finditer(cleaned_text):
+            candidate = _canonicalize_deadline_text(match.group(1))
+            tail = cleaned_text[match.end() : match.end() + 24]
+            if any(keyword in tail for keyword in ("提交响应文件", "递交响应文件", "提交投标文件", "递交投标文件", "开标")):
+                return candidate
+    return ""
+
+
+def _extract_datetime_from_snippet(snippet: str) -> str:
+    snippet_text = str(snippet or "").replace("：", ":").strip()
+    for pattern in DATETIME_RE_LIST:
+        match = pattern.search(snippet_text)
+        if match:
+            return _canonicalize_deadline_text(match.group(1))
+    return ""
+
+
+def _normalize_deadline_text(value: Any) -> str:
+    text = str(value or "").replace("：", ":").strip()
+    if not text:
+        return ""
+    return _canonicalize_deadline_text(text)
+
+
+def _canonicalize_deadline_text(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", str(text or "").replace("：", ":").strip())
+    normalized = normalized.replace("时", ":").replace("分", "").replace("秒", "")
+    normalized = normalized.replace("日 ", "日")
+    return normalized
+
+
+def _build_quality_risk_note(notice: Notice, detail: dict[str, Any] | None) -> str | None:
+    notes: list[str] = []
+    base_note = str((detail or {}).get("detail_risk_note") or "").strip()
+    structured_attachments = (detail or {}).get("structured_attachments") or []
+    nested_files = ((detail or {}).get("detail") or {}).get("GovernmentPurchaseFile") or []
+    if base_note:
+        notes.append(base_note)
+    if _is_tender_like_notice(notice) and not (notice.bid_open_or_response_deadline or "").strip():
+        notes.append("招标/采购类公告未提取到截止时间，可能原文缺失或需查看附件/采购文件")
+    if notice.has_attachment or structured_attachments or nested_files:
+        notes.append(ATTACHMENT_LIMIT_NOTE)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for note in notes:
+        compact = note.strip()
+        if not compact or compact in seen:
+            continue
+        seen.add(compact)
+        deduped.append(compact)
+    return "；".join(deduped) or None
+
+
+def _is_tender_like_notice(notice: Notice) -> bool:
+    notice_type = (notice.notice_type or "").strip()
+    procurement_method = (notice.procurement_method or "").strip()
+    if any(keyword in notice_type for keyword in RELAXED_NOTICE_KEYWORDS):
+        return False
+    if any(keyword in notice_type for keyword in TENDER_NOTICE_KEYWORDS):
+        return True
+    return any(keyword in procurement_method for keyword in TENDER_NOTICE_KEYWORDS)
+
+
+def _notice_has_partial_gap(notice: Notice) -> bool:
+    return _is_tender_like_notice(notice) and not (notice.bid_open_or_response_deadline or "").strip()
