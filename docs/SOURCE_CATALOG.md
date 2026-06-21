@@ -2,158 +2,169 @@
 
 ## 1. 它是什么
 
-`Source Catalog` 是 TenderRadarLite 的“来源目录层”。
+`Source Catalog` 是 TenderRadarLite 的来源目录层，用来描述：
 
-它用于记录：
+- 当前有哪些来源
+- 每个来源的 `status`
+- 哪些来源已有本地 adapter
+- 哪些来源默认启用
+- 哪些来源只是候选、规划或阻塞记录
 
-- 当前支持哪些来源
-- 哪些来源已有 adapter
-- 哪些来源只是 candidate
-- 哪些来源计划后续研究
-- 哪些来源因风险暂不建议接入
-- 每个来源的地区、来源类型、公告类型、附件可能性、访问风险、数据质量、备注和来源依据
+运行启停真相在：
 
-当前配置文件：
+- `config/sources.json`
+
+来源状态真相在：
 
 - `config/source_catalog.yaml`
 
-当前只读工具模块：
-
-- `app/source_catalog.py`
-
 ## 2. 它不是什么
 
-Source Catalog 不是抓取器。
+Source Catalog 不是抓取器，不会：
+
+- 自动新增来源
+- 自动生成 adapter
+- 自动触发抓取
+- 自动触发 Feishu
+- 自动调用 AI
+- 自动把 `candidate` 或 `planned` 变成可运行来源
+
+## 3. status 定义
+
+### `supported`
+
+- 当前已有本地 adapter
+- 当前可作为默认可用来源
+- 可用于 `v0.1-alpha` 的主展示路径
+
+### `alpha`
+
+- 当前已有本地 adapter
+- 已具备一定可用性，但不承诺稳定
+- 通常默认关闭
+- `alpha` 不等于不可用，只是不应包装成 `supported`
+
+### `candidate`
+
+- 已进入来源目录
+- 尚未完成本地验证
+- 未接入当前运行主路径
+
+### `planned`
+
+- 仅表示后续计划研究
+- 当前不代表已支持抓取
+
+### `blocked`
+
+- 表示当前不适合走现有本地 requests 路线
+- 可能原因包括登录要求、反爬风险、稳定性问题、敏感边界或维护成本
+- `blocked` 不等于永久不可做，只是当前不进入本地 Alpha 主线
+
+## 4. 当前 v0.1-alpha 关键来源
+
+当前 `supported`：
+
+- 衡阳公共资源交易平台 / 建设工程交易
+- 衡阳公共资源交易平台 / 政府采购交易
+
+当前 `alpha`：
+
+- 长沙公共资源交易平台 / 长沙政府采购交易，默认关闭
+- 中国政府采购网 / 地方公告，默认关闭
+
+说明：
+
+- 衡阳建设工程为 `supported`
+- 衡阳政府采购为 `supported`
+- 长沙政府采购为 `alpha`
+- 中国政府采购网地方公告为 `alpha`
+
+## 5. status 与字段风险的关系
+
+`source_status` 反映的是来源接入与运行边界，不应被单个字段风险直接污染。
+
+也就是说：
+
+- 某来源有字段缺失，不等于必须降成 `blocked`
+- 某来源有摘要偏弱，不等于必须移出 `alpha`
+- 某来源的字段边界风险，应该写入 `known limitations` 或 `detail_risk_note`
+
+当前字段风险的正式归档位置应优先使用：
+
+- [docs/KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)
+- `config/source_catalog.yaml` 中的 `notes`
+- 运行时 `detail_risk_note`
+
+## 6. 如何从 candidate 升级为 alpha
+
+至少应满足：
+
+1. 本地确认入口可访问
+2. 明确公告类型和字段结构
+3. 完成本地 adapter
+4. 跑通最小抓取链路
+5. 明确安全边界与默认启停策略
+
+## 7. 如何从 alpha 升级为 supported
+
+至少应满足：
+
+1. adapter 已存在且可运行
+2. 真实本地验证通过
+3. 默认启停策略明确
+4. 文档边界清楚
+5. 已知字段风险可接受，不会误导成“稳定全国覆盖”
+
+## 8. blocked 的理解
+
+`blocked` 表示“当前不适合走本地 requests 路线”，常见原因包括：
+
+- 登录 / 验证码要求
+- 高强度反爬
+- 访问稳定性过差
+- 敏感范围
+- 维护成本不适合当前 Alpha
+
+它不等于永久放弃，只是当前版本不把它纳入主线。
+
+## 9. 与运行主路径的关系
+
+当前开源主路径仍是：
+
+1. 命令行运行
+2. Windows `.bat` 运行
+3. 本地 HTML 报告查看
+
+Source Catalog 的作用是帮助解释“当前为什么只默认开两个来源、为什么另两个来源默认关闭”，不是把所有目录项都变成可运行承诺。
+
+## 10. Web 控制台中的 Source Catalog
+
+本地控制台 `/sources` 页面当前只做只读展示：
+
+- 展示来源总数和状态统计
+- 展示 `supported / alpha / candidate / planned / blocked`
+- 展示地区、类型、风险和备注
 
 它不会：
 
-- 自动接入新站点
-- 自动生成 adapter
-- 自动抓取 candidate / planned 来源
-- 自动触发 Feishu
-- 自动调用 AI
-- 自动执行全国全站爬取
+- 一键抓取
+- 一键接入新来源
+- 修改 `config/sources.json`
+- 修改 `config/source_catalog.yaml`
 
-## 3. status 含义
+## 11. 当前对外表述边界
 
-- `supported`
-  - 当前已有本地 adapter，且当前 Alpha 视为已支持来源。
-- `alpha`
-  - 当前已有本地 adapter，但仍处于 Alpha 状态，或尚未默认启用。
-- `candidate`
-  - 只进入来源目录，未本地验证，未接入 adapter，不代表已经支持抓取。
-- `planned`
-  - 计划后续研究的来源，入口、字段或接入方式仍待人工确认。
-- `blocked`
-  - 因敏感范围、稳定性、登录要求、反爬或业务边界风险，当前不建议接入。
+当前可以准确表述为：
 
-## 4. candidate / planned 与 supported 的区别
+- TenderRadarLite 已有 2 个默认可用 `supported` 来源
+- 另有 2 个默认关闭的 `alpha` 来源
+- 当前已覆盖 JSON API 与 static HTML 两类来源样式
+- 当前已具备 Source Catalog、SQLite 去重和本地 HTML 报告主链路
 
-`supported / alpha` 才与当前本地 adapter 有关。
+当前不应表述为：
 
-`candidate / planned / blocked` 只是知识库记录：
-
-- 不是当前运行来源
-- 不是当前默认抓取来源
-- 不是“已经支持”
-- 不是“下一步自动接入”
-
-## 5. 第三方 GitHub 项目如何使用
-
-第三方 GitHub 项目在本轮只作为来源参考：
-
-- 用来补充来源入口清单
-- 用来观察字段设计
-- 用来记录常见风险模式
-
-不会：
-
-- 复制第三方代码
-- 直接照抄第三方来源网页清单
-- 在 LICENSE 不清晰时复用实现
-
-## 6. LICENSE 不清时如何处理
-
-如果参考项目 LICENSE 不清，处理原则是：
-
-- 只记录来源线索
-- 不复制代码
-- 不复制整套来源列表
-- 不把它当作可直接复用的 adapter 资产
-
-## 7. candidate 升级为 alpha 的条件
-
-至少满足：
-
-- 本地人工确认来源入口
-- 本地确认目标页面可访问
-- 明确字段结构和公告类型
-- 明确不涉及当前禁止范围
-- 已新增并验证本地 adapter
-
-## 8. alpha 升级为 supported 的条件
-
-至少满足：
-
-- adapter 已存在且可运行
-- 本地验证通过
-- 状态和边界说明清楚
-- 不依赖登录、验证码绕过或高风险抓取
-- 在当前 Alpha 范围内被确认可作为默认支持来源
-
-## 9. 什么情况下应标为 blocked
-
-典型情况包括：
-
-- 敏感范围，不适合当前 Alpha
-- 需要登录或高强度反爬绕过
-- 稳定性或延迟风险过高
-- 业务边界不适合本地优先公开模式
-- 付费站点或企业门户集合，合规和维护成本过高
-
-## 10. 如何在 Web 控制台查看
-
-启动本地控制台后访问：
-
-- `http://127.0.0.1:8765/sources`
-
-左侧菜单会显示：
-
-- `来源目录`
-
-页面会明确说明：
-
-- `candidate / planned` 不代表已经支持抓取
-- `supported / alpha` 才与当前 adapter 有关
-- 本页只是来源知识库，不会触发抓取
-
-## 11. 当前 P1-2A 对外表述边界
-
-当前 `supported` 来源为两个：
-
-- 衡阳建设工程交易
-- 衡阳政府采购交易
-
-当前 `alpha` 来源为两个：
-
-- 长沙公共资源交易平台 / 政府采购交易（默认 `enabled=false`）
-- 中国政府采购网 / 地方公告（默认 `enabled=false`）
-
-这代表：
-
-- 已跑通同一衡阳平台下建设工程交易与政府采购交易两个真实来源
-- 已跑通统一采集、结构化、SQLite 去重和本地 HTML 报告链路
-- 长沙政府采购与中国政府采购网地方公告当前都只作为默认关闭的 Alpha 来源
-
-这不代表：
-
-- 已支持全国多来源采集
-- 已接入 Source Catalog 中全部来源
-- 已完成跨网站多来源采集
-- `alpha` 不等于 `supported`，长沙当前即使完成列表修复，也仍不应直接升级为 supported
-
-补充说明：
-
-- 长沙来源当前已确认前端真实列表仍走 `projectInformation/selectAll`，但必须显式附带前端过滤参数 `descs=noticeSendTime&notice=1&tenderMode=公开招标`。
-- 长沙详情接口 `getAnnouncementBySectionId` 返回的是同一标段下的多条公告，不能再默认取第一条，必须按列表公告类型优先选择匹配的招标公告。
-- 经过上述修复后，最近招标公告列表可恢复为近期倒序结果；但字段完整度、附件未解析、默认关闭等 Alpha 边界仍然存在，因此当前仍不建议作为开源版主能力展示来源。
+- 全国稳定多来源平台
+- 所有来源都已支持
+- 所有 `alpha` 来源都接近 `supported`
+- 跨站大规模稳定采集已经完成

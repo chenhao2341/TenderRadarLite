@@ -1,118 +1,170 @@
 # TenderRadarLite
 
-TenderRadarLite 是一个本地优先、可扩展的招投标线索监控工具，支持本地 HTML 报告、行业 profiles、Windows 双击运行和可选飞书同步。
+TenderRadarLite 是一个本地优先的招投标线索发现与字段质量审计 Alpha 工具。
 
-## 项目定位
+它当前面向的是“本地抓取公开公告、做结构化去重、查看本地 HTML 报告、持续校准字段质量”的工程化使用场景，不是成熟 SaaS，不是全国招投标平台，也不是自动投标工具。
 
-这个仓库当前更适合以下场景：
+## 当前不是
 
-- 在本地定时或手动抓取公开招投标公告
-- 生成结构化结果并做 SQLite 去重沉淀
-- 用行业 profile 做轻量分类筛选
-- 直接查看本地 HTML 报告
-- 在需要时接入飞书多维表格或 App Bot
+- 不是成熟 SaaS
+- 不是全国招投标平台
+- 不是自动投标工具
+- 不是中标预测系统
+- 不绕过登录 / 验证码 / 反爬
+- 不默认下载附件
+- 不默认解析 PDF / DOC / DOCX
+- 不默认触发 Feishu
+- 不默认调用 AI
 
-当前阶段是本地优先的开源工具，不是全国全行业成熟平台，也不是重后台 SaaS。
+## 当前来源边界
 
-## 当前能力
+默认 `supported` 来源：
 
-- 本地抓取公开公告
-- 结构化公告字段提取
+- 衡阳公共资源交易平台 / 建设工程交易
+- 衡阳公共资源交易平台 / 政府采购交易
+
+默认关闭的 `alpha` 来源：
+
+- 长沙公共资源交易平台 / 长沙政府采购交易
+- 中国政府采购网 / 地方公告
+
+说明：
+
+- `supported` 代表当前已有本地 adapter，且在 `v0.1-alpha` 中可作为默认可用来源。
+- `alpha` 不等于不可用，但当前不承诺稳定，默认保持关闭。
+- 当前“双来源”成立于同一衡阳平台下的两个真实来源，不应包装成全国稳定跨站覆盖。
+
+更完整的来源状态说明见 [docs/SOURCE_CATALOG.md](docs/SOURCE_CATALOG.md)。
+
+## 当前核心能力
+
+- 多来源 adapter 框架
 - SQLite 去重与本地留存
-- 行业 profiles 分类框架
-- 本地 HTML 报告输出
-- Windows 双击运行入口
-- 可选飞书多维表格 / App Bot 同步
-- 适配器框架与来源注册机制
-- 自动化测试覆盖
+- 本地 HTML 报告
+- 地区 / 来源分组展示
+- Source Catalog
+- 字段完整性审计 workflow
+- Windows 本地运行
+- 可选 Feishu 集成
+- 可选 AI 分析
 
-## 快速开始
+## Quickstart
 
-### 命令行
+### 1. 安装依赖
 
 ```powershell
 python -m pip install -r requirements.txt
-python run_mvp.py --local-html
-python run_mvp.py --local-html --profile design_consulting
 ```
 
-### Windows 双击运行
-
-1. 双击 `scripts/检查运行环境.bat`
-2. 双击 `scripts/启动本地招投标报告.bat`
-
-## 关键说明
-
-- 本地 HTML 模式不需要飞书。
-- 飞书属于高级可选插件，不是本地报告的前置依赖。
-- `design_consulting` 是当前最完整的 profile。
-- `software_it`、`construction`、`medical_equipment` 目前处于 alpha/template 状态，需要按真实场景继续校准。
-- 当前仓库重点是本地抓取、结构化和筛选能力，不承诺全国范围、多行业、生产级全覆盖。
-
-## 常用运行方式
+### 2. 运行默认本地主路径
 
 ```powershell
-python run_mvp.py --local-only
-python run_mvp.py --local-html
 python run_mvp.py --local-html --profile design_consulting
 ```
 
-生成成功后，本地 HTML 报告默认输出到 `reports/latest.html`。
+也可以直接运行：
+
+```powershell
+python run_mvp.py --local-html
+```
+
+### 3. 查看报告
+
+默认输出到：
+
+```text
+reports/latest.html
+```
+
+可直接用浏览器打开，或双击 Windows 脚本打开。
+
+更完整说明见 [docs/WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md)。
+
+## 默认安全边界
+
+- Feishu 默认关闭，不是主路径前置条件
+- AI 默认关闭，不会随默认命令自动调用
+- `alpha` 来源默认关闭
+- 不提交 `.env`
+- 不提交 `data/bids.db`
+- 不提交 `reports/latest.html`
+- 不提交 `logs/*`
+
+更完整安全说明见 [docs/SECURITY.md](docs/SECURITY.md)。
+
+## 已知限制摘要
+
+- 衡阳建设工程最近 10 条 live 样本存在非严格倒序 / 旧公告混入风险
+- 衡阳建设工程更正 / 澄清 / 暂停类字段边界仍可继续加强
+- 长沙政府采购为 `alpha`，默认关闭，部分 `deadline` 缺失，`content_summary` 语义偏弱
+- 中国政府采购网地方公告为 `alpha`，默认关闭，结果公告 `content_summary` 受原文限制
+- 不下载附件，不解析 PDF / DOC / DOCX
+- 不做自动投标，不承诺全国稳定覆盖
+- 仍偏工程化 Alpha，不承诺普通非技术用户零门槛使用
+
+完整列表见 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md)。
 
 ## 文档入口
 
 - [Windows 快速开始](docs/WINDOWS_QUICKSTART.md)
-- [本地 HTML 报告说明](docs/LOCAL_HTML.md)
-- [Profiles 说明](docs/PROFILES.md)
-- [飞书可选配置](docs/FEISHU_SETUP.md)
+- [Source Catalog](docs/SOURCE_CATALOG.md)
+- [Web 控制台边界](docs/WEB_CONSOLE.md)
 - [项目架构](docs/ARCHITECTURE.md)
+- [本地 HTML 报告](docs/LOCAL_HTML.md)
+- [飞书可选配置](docs/FEISHU_SETUP.md)
+- [Profiles 说明](docs/PROFILES.md)
 - [安全说明](docs/SECURITY.md)
-- [路线图](docs/ROADMAP.md)
-- [发布前检查清单](docs/RELEASE_CHECKLIST.md)
+- [Known Limitations](docs/KNOWN_LIMITATIONS.md)
+- [Release Notes v0.1-alpha](docs/RELEASE_NOTES_v0.1-alpha.md)
+- [Roadmap](docs/ROADMAP.md)
+- [FAQ](docs/FAQ.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Release Checklist](docs/RELEASE_CHECKLIST.md)
 
-## 安全说明
+## Roadmap 摘要
 
-开源前请明确不要提交以下内容：
+- `v0.1-alpha`：本地报告、双 supported 来源、默认关闭 alpha 来源、Source Catalog、字段质量审计、Windows 本地运行、安全边界说明
+- `v0.2-alpha`：Web 控制台真实运行入口
+- `v0.3-beta`：Source Probe / 更多异构来源 / 质量持续修复
 
-- `.env`
-- `data/bids.db`
-- `reports/latest.html`
-- `logs/*`
-- 飞书 `App Secret`
-- 飞书 `Webhook`
-- 飞书 `chat_id`
-- 飞书 `tenant_access_token`
+## 开源发布边界
 
-`.env.example` 只能保留占位符，不能放真实密钥。
+- 当前开源主路径是命令行 / Windows 脚本 / 本地 HTML 报告
+- Web 控制台当前仍是 Alpha 骨架，不是完整运行入口
+- 不承诺所有来源字段完美
+- 不承诺全国稳定覆盖
+- 不承诺附件深度解析
+- 不承诺自动投标、SaaS 或登录 / 验证码绕过能力
+
+## 示例材料
+
+当前仓库未提交真实运行截图。
+
+- 如需补展示材料，请参考 [docs/assets/README.md](docs/assets/README.md)
+- 示例截图待补充
 
 ## 项目结构
 
 ```text
 run_mvp.py
 app/
+  adapters/
+  html_report.py
   main.py
   runner.py
-  adapters/
+  source_catalog.py
   storage.py
-  html_report.py
-  feishu.py
-profiles/
+  web_console.py
 config/
 docs/
+profiles/
+reports/
 scripts/
 tests/
 ```
 
 更详细的模块说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## 开源边界
-
-- 不内置真实密钥
-- 不包含本地运行产生的数据库、日志和报告产物
-- 不承诺所有来源长期稳定
-- 不将飞书作为默认必选依赖
-- 当前不包含 EXE、安装包和全国化平台能力
-
 ## License
 
-仓库当前如需公开发布，建议在维护者确认后再补充正式 License。常见候选可考虑 `MIT` 或 `Apache-2.0`，但本轮不擅自新增许可证文件。
+仓库如需公开发布，建议由维护者确认后补充正式 License 文件。本轮不擅自新增许可证。
