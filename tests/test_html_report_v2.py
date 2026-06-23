@@ -388,12 +388,44 @@ class HtmlReportV2Tests(unittest.TestCase):
         ccgp_local_notice.source_subtype = "\u5730\u65b9\u516c\u544a"
         ccgp_local_notice.region = "\u5c71\u4e1c"
 
+        zhejiang_notice = self._notice(
+            project_name="Zhejiang Project",
+            suffix="zhejiang",
+            lead_tier="DIRECT",
+            section_id="section-zhejiang",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-17 09:30:00",
+        )
+        zhejiang_notice.source = "浙江政府采购网"
+        zhejiang_notice.source_subtype = "政府采购 / JSON门户流"
+        zhejiang_notice.region = "浙江省"
+
+        unknown_notice = self._notice(
+            project_name="Unknown Source Project",
+            suffix="unknown-source",
+            lead_tier="WATCHLIST",
+            section_id="section-unknown-source",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-13 10:00:00",
+        )
+        unknown_notice.source = "Unregistered Source"
+        unknown_notice.source_subtype = "Custom Feed"
+        unknown_notice.region = "未知地区"
+
         with tempfile.TemporaryDirectory() as raw_dir:
             report_path = Path(raw_dir) / "latest.html"
             write_html_report(
                 report_path,
-                [hengyang_construction, hengyang_procurement, changsha_direct, changsha_exclude, ccgp_local_notice],
-                source_count=4,
+                [
+                    hengyang_construction,
+                    hengyang_procurement,
+                    changsha_direct,
+                    changsha_exclude,
+                    ccgp_local_notice,
+                    zhejiang_notice,
+                    unknown_notice,
+                ],
+                source_count=6,
                 generated_at="2026-06-17 12:00:00",
             )
             html = report_path.read_text(encoding="utf-8")
@@ -434,6 +466,13 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertIn(">alpha<", ccgp_local_slice)
         self.assertIn("\u516c\u544a\u6570\u91cf</strong><span>1</span>", ccgp_local_slice)
         self.assertIn("WATCHLIST \u6570</strong><span>1</span>", ccgp_local_slice)
+
+        zhejiang_slice = self._source_group_slice(html, "浙江政府采购网 / 政府采购 / JSON门户流")
+        self.assertIn(">alpha<", zhejiang_slice)
+        self.assertNotIn(">unknown<", zhejiang_slice)
+
+        unknown_slice = self._source_group_slice(html, "Unregistered Source / Custom Feed")
+        self.assertIn(">unknown<", unknown_slice)
 
     def test_report_groups_unknown_region_and_missing_subtype_conservatively(self) -> None:
         unknown_region_notice = self._notice(

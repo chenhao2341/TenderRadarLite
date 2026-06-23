@@ -44,5 +44,20 @@
     "region": "全国",
     "pages_scanned": 1,
     "page_size": 20
+  },
+  {
+    "name": "Zhejiang Government Procurement",
+    "source": "浙江政府采购网",
+    "source_subtype": "政府采购 / JSON门户流",
+    "module": "app.adapters.zhejiang_procurement",
+    "class": "ZhejiangProcurementAdapter",
+    "enabled": false,
+    "url": "https://zfcg.czt.zj.gov.cn/portal/searchHome",
+    "region": "浙江省",
+    "category_code": "110-606633",
+    "sub_codes": ["110-306476", "110-684034", "110-511933"],
+    "exclude_district_prefix": ["90", "006011", "H0", "001111"],
+    "parent_id": "600007",
+    "page_size": 10
   }
 ]

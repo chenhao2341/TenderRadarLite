@@ -6,6 +6,8 @@ notes:
 sources:
   - id: hengyang-construction
     name: 衡阳分平台 / 建设工程交易
+    source: 衡阳分平台
+    source_subtype: 建设工程交易
     homepage: https://hengyang.hnsggzy.com/
     list_entry_url: https://hengyang.hnsggzy.com/tradeApi/constructionTender/listByFile?regionCode=430400&current=1&size=10
     region: 衡阳
@@ -27,6 +29,8 @@ sources:
     license_note: Native adapter only. No third-party code reuse.
   - id: hengyang-procurement
     name: 衡阳分平台 / 政府采购交易
+    source: 衡阳分平台
+    source_subtype: 政府采购交易
     homepage: https://hengyang.hnsggzy.com/
     list_entry_url: https://hengyang.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430400&current=1&size=10
     region: 衡阳
@@ -48,6 +52,8 @@ sources:
     license_note: Native adapter only. No third-party code reuse.
   - id: changsha-procurement
     name: 长沙公共资源交易平台 / 政府采购交易
+    source: 长沙公共资源交易平台
+    source_subtype: 长沙政府采购交易
     homepage: https://changsha.hnsggzy.com/
     list_entry_url: https://changsha.hnsggzy.com/tradeApi/governmentPurchase/projectInformation/selectAll?regionCode=430100&current=1&size=10&descs=noticeSendTime&notice=1&tenderMode=%E5%85%AC%E5%BC%80%E6%8B%9B%E6%A0%87
     region: 长沙
@@ -69,6 +75,8 @@ sources:
     license_note: Native adapter only. No third-party code reuse.
   - id: china-government-procurement-local
     name: 中国政府采购网 / 地方公告
+    source: 中国政府采购网
+    source_subtype: 地方公告
     homepage: https://www.ccgp.gov.cn/
     list_entry_url: https://www.ccgp.gov.cn/cggg/dfgg/
     region: 全国
@@ -153,25 +161,27 @@ sources:
     license_note: Reference only. License unclear projects are not reused.
   - id: zhejiang-government-procurement
     name: 浙江政府采购网
+    source: 浙江政府采购网
+    source_subtype: 政府采购 / JSON门户流
     homepage: https://zfcg.czt.zj.gov.cn/
-    list_entry_url: unknown
-    region: 浙江
+    list_entry_url: https://zfcg.czt.zj.gov.cn/portal/searchHome
+    region: 浙江省
     source_type: government_procurement
     supported_notice_types: ["采购公告", "结果公告", "更正公告"]
-    adapter: ""
-    status: candidate
+    adapter: app.adapters.zhejiang_procurement
+    status: alpha
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
-    has_detail_page: unknown
+    has_detail_page: yes
     has_attachments: likely
     access_risk: medium
     anti_bot_risk: medium
     login_requirement: no
     data_quality: medium
-    update_frequency: unknown
-    notes: 未本地验证，未接入 adapter，仅作来源目录记录；列表入口待后续人工确认。
-    source_from: github_reference
-    reference_project: P1-1R scout report
-    license_note: Reference only. License unclear projects are not reused.
+    update_frequency: frequent
+    notes: 明文 JSON API / JSON 门户流；POST /portal/searchHome 可直取列表，详情页本身为前端壳页，当前依赖 /portal/detail 返回正文 HTML；默认关闭；默认结果可能混入置顶旧文或非严格时序；字段完整度有限，不作为 supported 主来源。
+    source_from: native
+    reference_project: P1-5A zhejiang procurement json portal alpha
+    license_note: Native adapter only. No third-party code reuse.
   - id: guangxi-government-procurement
     name: 广西政府采购网
     homepage: http://zfcg.gxzf.gov.cn/

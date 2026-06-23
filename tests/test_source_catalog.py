@@ -65,8 +65,8 @@ class SourceCatalogTests(unittest.TestCase):
         grouped = group_sources_by_status(catalog)
 
         self.assertEqual(len(grouped["supported"]), 2)
-        self.assertEqual(len(grouped["alpha"]), 2)
-        self.assertEqual(len(grouped["candidate"]), 6)
+        self.assertEqual(len(grouped["alpha"]), 3)
+        self.assertEqual(len(grouped["candidate"]), 5)
         self.assertEqual(len(grouped["planned"]), 6)
         self.assertEqual(len(grouped["blocked"]), 4)
         supported_ids = {item["id"] for item in list_sources(catalog, status="supported")}
@@ -74,6 +74,7 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(find_source_by_id(catalog, "china-government-procurement")["status"], "candidate")
         self.assertEqual(find_source_by_id(catalog, "changsha-procurement")["status"], "alpha")
         self.assertEqual(find_source_by_id(catalog, "china-government-procurement-local")["status"], "alpha")
+        self.assertEqual(find_source_by_id(catalog, "zhejiang-government-procurement")["status"], "alpha")
 
     def test_github_reference_sources_cannot_be_marked_supported(self) -> None:
         catalog = load_source_catalog()
@@ -94,8 +95,8 @@ class SourceCatalogTests(unittest.TestCase):
                 "total": 20,
                 "by_status": {
                     "supported": 2,
-                    "alpha": 2,
-                    "candidate": 6,
+                    "alpha": 3,
+                    "candidate": 5,
                     "planned": 6,
                     "blocked": 4,
                 },
@@ -110,6 +111,25 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertEqual(procurement["status"], "supported")
         self.assertEqual(procurement["adapter"], "app.adapters.hengyang_procurement")
         self.assertEqual(procurement["source_from"], "native")
+
+    def test_supported_and_alpha_sources_expose_runtime_source_mapping_fields(self) -> None:
+        catalog = load_source_catalog()
+        active_entries = {
+            item["id"]: item
+            for item in catalog["sources"]
+            if item["id"]
+            in {
+                "hengyang-construction",
+                "hengyang-procurement",
+                "changsha-procurement",
+                "china-government-procurement-local",
+                "zhejiang-government-procurement",
+            }
+        }
+
+        self.assertEqual(active_entries["zhejiang-government-procurement"]["source"], "浙江政府采购网")
+        self.assertEqual(active_entries["zhejiang-government-procurement"]["source_subtype"], "政府采购 / JSON门户流")
+        self.assertEqual(active_entries["china-government-procurement-local"]["source_subtype"], "地方公告")
 
     def test_summary_and_sources_do_not_leak_secret_like_fields(self) -> None:
         catalog = load_source_catalog()

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -9,9 +11,11 @@ from app.adapters.ccgp_local import (
     BROWSER_HEADERS,
     CcgpLocalAdapter,
     _build_dedupe_key,
+    _normalize_detail_url,
     _normalize_detail_deadline,
 )
 from app.source_catalog import find_source_by_id, load_source_catalog
+from app.storage import Storage
 
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "ccgp_local"
@@ -312,6 +316,52 @@ class CcgpLocalAdapterTests(unittest.TestCase):
         catalog_entry = find_source_by_id(catalog, "china-government-procurement-local")
         self.assertIsNotNone(catalog_entry)
         self.assertEqual(catalog_entry["status"], "alpha")
+
+
+    def test_detail_url_normalization_trims_and_drops_fragment(self) -> None:
+        normalized = _normalize_detail_url(
+            " /cggg/dfgg/gkzb/202606/t20260621_26784706.htm?foo=1#section ",
+            "https://www.ccgp.gov.cn/cggg/dfgg/",
+        )
+        self.assertEqual(
+            normalized,
+            "https://www.ccgp.gov.cn/cggg/dfgg/gkzb/202606/t20260621_26784706.htm?foo=1",
+        )
+
+    def test_same_fixture_batch_is_duplicate_on_second_save(self) -> None:
+        with mock.patch.object(
+            self.adapter,
+            "_request_text",
+            return_value=(_read_fixture("list_page_1.html"), 200, None),
+        ):
+            items = self.adapter.fetch_list()
+
+        detail_html_map = {
+            "26784706": _read_fixture("detail_open_bid.html"),
+            "26784710": _read_fixture("detail_consult.html"),
+            "26784703": _read_fixture("detail_award.html"),
+        }
+
+        def fake_request_text(url: str) -> tuple[str | None, int | None, str | None]:
+            article_id = url.rsplit("_", 1)[-1].split(".", 1)[0]
+            html = detail_html_map.get(article_id)
+            if html is not None:
+                return html, 200, None
+            return "<div></div>", 200, None
+
+        with mock.patch.object(self.adapter, "_request_text", side_effect=fake_request_text):
+            notices = [self.adapter.normalize(item, self.adapter.fetch_detail(item)) for item in items]
+
+        fd, raw_path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        os.unlink(raw_path)
+        storage = Storage(Path(raw_path))
+        first_inserted = sum(1 for notice in notices if storage.save_notice(notice))
+        second_inserted = sum(1 for notice in notices if storage.save_notice(notice))
+        del storage
+
+        self.assertEqual(first_inserted, len(notices))
+        self.assertEqual(second_inserted, 0)
 
 
 if __name__ == "__main__":

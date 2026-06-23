@@ -1,0 +1,46 @@
+{
+  "success": true,
+  "result": {
+    "data": {
+      "title": "浙江师范大学关于高精度信号测量与振动控制装备公开招标公告",
+      "articleId": "/1DDoavnYlo4kXCYBI7Pxw==",
+      "siteId": 110,
+      "author": "浙江师范大学",
+      "projectCode": "330000263030080000973-ZB2026039（第2次）",
+      "projectName": "高精度信号测量与振动控制装备",
+      "publishDate": 1782177789000,
+      "announcementType": 3001,
+      "districtCode": "339900",
+      "isGovPurchase": false,
+      "categoryNames": [
+        "采购公告",
+        "政府采购公告",
+        "采购项目公告",
+        "招标公告"
+      ],
+      "announcementLinkDtoList": [
+        {
+          "articleId": "/1DDoavnYlo4kXCYBI7Pxw==",
+          "typeName": "采购公告",
+          "isExist": true,
+          "isCurrent": true,
+          "publishDate": "2026-06-23",
+          "order": 1,
+          "publishDateTime": 1782177789000
+        }
+      ],
+      "content": "<div class=\"ann-wrapper\"><div class=\"ann-block ann-block-border\"><p><span class=\"bold\">项目概况</span></p><p>高精度信号测量与振动控制装备招标项目的潜在投标人应在线上获取招标文件，并于2026年07月14日 08:30（北京时间）前递交投标文件。</p></div><div class=\"ann-block\"><p class=\"ann-block-title\">一、项目基本情况</p><div class=\"ann-content\"><p>项目编号：330000263030080000973-ZB2026039（第2次）</p><p>项目名称：高精度信号测量与振动控制装备</p><p>预算金额（元）：270000</p><p>最高限价（元）：270000</p><p>采购需求：采购高精度信号测量与振动控制装备一批，用于教学与科研。</p></div></div><div class=\"ann-block\"><p class=\"ann-block-title\">二、申请人的资格要求</p><div class=\"ann-content\"><p>满足《中华人民共和国政府采购法》第二十二条规定。</p><p>本项目的特定资格要求：无。</p></div></div></div>",
+      "attachmentVO": {
+        "domain": "https://zcy-gov-open-doc.oss-cn-north-2-gov-1.aliyuncs.com/",
+        "attachments": [
+          {
+            "fileId": "1024FPA/330000/10007103194/20266/sample-procurement-file.doc",
+            "name": "采购意向情况说明.doc",
+            "isShow": true
+          }
+        ]
+      }
+    }
+  },
+  "error": null
+}

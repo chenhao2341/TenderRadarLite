@@ -1478,7 +1478,11 @@ def _build_source_catalog_lookup() -> dict[tuple[str, str, str], dict[str, str]]
         if not isinstance(source, dict):
             continue
         region = str(source.get("region") or "").strip()
-        source_name, subtype_name = _split_catalog_source_name(str(source.get("name") or "").strip())
+        explicit_source_name = str(source.get("source") or "").strip()
+        explicit_subtype_name = str(source.get("source_subtype") or "").strip()
+        parsed_source_name, parsed_subtype_name = _split_catalog_source_name(str(source.get("name") or "").strip())
+        source_name = explicit_source_name or parsed_source_name
+        subtype_name = explicit_subtype_name or parsed_subtype_name
         if not source_name:
             continue
         status = str(source.get("status") or "").strip() or "unknown"

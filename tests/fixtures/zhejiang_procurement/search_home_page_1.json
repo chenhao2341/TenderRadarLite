@@ -1,0 +1,73 @@
+{
+  "success": true,
+  "result": {
+    "data": {
+      "todayTotal": 4,
+      "total": 500610,
+      "validCount": 1915,
+      "code": "110-978863",
+      "moduleName": "政府采购公告",
+      "firstId": "600007",
+      "children": [
+        {
+          "title": "浙江师范大学关于高精度信号测量与振动控制装备公开招标公告",
+          "articleId": "/1DDoavnYlo4kXCYBI7Pxw==",
+          "pubDate": 1782177789000,
+          "bidOpeningTime": 1783989000000,
+          "bidOpeningTimeRemainDays": null,
+          "publishDateString": "2026-06-23",
+          "districtName": "浙江省本级",
+          "purchaseMethod": "公开招标",
+          "cover": null,
+          "urgentLevel": 1,
+          "closeJump": null,
+          "remark": null,
+          "ext": null,
+          "stickLevel": 7258089600000,
+          "isStickLevel": false,
+          "purchaseName": "浙江师范大学",
+          "isReformation": false
+        },
+        {
+          "title": "浙江天隆工程管理有限公司关于双桥街道辖区建筑垃圾运输消纳处置采购项目的公开招标公告",
+          "articleId": "WCPylIZYKj3yuR+onMA1tA==",
+          "pubDate": 1782175603000,
+          "bidOpeningTime": 1783990800000,
+          "bidOpeningTimeRemainDays": null,
+          "publishDateString": "2026-06-23",
+          "districtName": "定海区",
+          "purchaseMethod": "公开招标",
+          "cover": null,
+          "urgentLevel": 1,
+          "closeJump": null,
+          "remark": null,
+          "ext": null,
+          "stickLevel": 7258089600000,
+          "isStickLevel": false,
+          "purchaseName": "舟山市定海区人民政府双桥街道办事处",
+          "isReformation": false
+        },
+        {
+          "title": "浙江星兴工程咨询有限公司关于2026年教师专业发展委托培训项目的竞争性磋商公告",
+          "articleId": "pzapLHgRCrYzpUMbgLPJ6Q==",
+          "pubDate": 1782175297000,
+          "bidOpeningTime": 1783040400000,
+          "bidOpeningTimeRemainDays": null,
+          "publishDateString": "2026-06-23",
+          "districtName": "吴兴区",
+          "purchaseMethod": "竞争性磋商",
+          "cover": null,
+          "urgentLevel": 1,
+          "closeJump": null,
+          "remark": null,
+          "ext": null,
+          "stickLevel": 7258089600000,
+          "isStickLevel": false,
+          "purchaseName": "湖州市吴兴区教育局教学研究与培训中心",
+          "isReformation": false
+        }
+      ]
+    }
+  },
+  "error": null
+}

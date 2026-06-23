@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
@@ -120,7 +120,7 @@ class CcgpLocalAdapter(BaseAdapter):
         return records
 
     def fetch_detail(self, item: dict[str, Any]) -> dict[str, Any] | None:
-        canonical_url = str(item.get("canonical_detail_url") or "").strip()
+        canonical_url = _normalize_detail_url(str(item.get("canonical_detail_url") or "").strip(), self.url)
         if not canonical_url:
             return None
 
@@ -389,7 +389,7 @@ def _parse_list_html(html: str, base_url: str) -> list[dict[str, Any]]:
 
     for item_match in LIST_ITEM_RE.finditer(match.group("body")):
         href = _clean_text(item_match.group("href"))
-        canonical_url = urljoin(base_url, href)
+        canonical_url = _normalize_detail_url(href, base_url)
         article_id = _extract_article_id(canonical_url)
         publish_time = _normalize_datetime(_clean_text(item_match.group("publish_time")))
         results.append(
@@ -614,6 +614,14 @@ def _normalize_attachment_url(base_url: str, href: str, anchor_id: str) -> str:
     if anchor_id:
         return f"{base_url}#attachment-{anchor_id}"
     return base_url
+
+
+def _normalize_detail_url(value: str, base_url: str) -> str:
+    absolute_url = urljoin(base_url, (value or "").strip())
+    if not absolute_url:
+        return ""
+    parts = urlsplit(absolute_url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, ""))
 
 
 def _is_business_attachment(href: str, title: str) -> bool:

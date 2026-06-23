@@ -8,6 +8,7 @@ TenderRadarLite 当前是本地优先的 `v0.1-alpha`。以下限制应被视为
 - Hengyang Construction 的更正 / 澄清 / 暂停类字段边界仍可继续加强。
 - Changsha Procurement 当前为 `alpha`，默认关闭，部分 `deadline` 缺失，`content_summary` 语义偏弱。
 - China Government Procurement Local 当前为 `alpha`，默认关闭，结果公告 `content_summary` 受原文限制。
+- Zhejiang Government Procurement 当前为 `alpha`，默认关闭，属于 JSON 门户流样本；默认结果可能存在置顶旧文 / 非严格时序风险，详情页本身为前端壳页，当前依赖 `/portal/detail`，字段完整度有限，不作为 supported 主来源。
 
 ## 集成与能力边界
 

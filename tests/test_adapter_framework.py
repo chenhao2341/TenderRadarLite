@@ -10,6 +10,7 @@ from app.adapters.ccgp_local import CcgpLocalAdapter
 from app.adapters.changsha_procurement import ChangshaProcurementAdapter
 from app.adapters.hengyang_construction import HengyangConstructionAdapter
 from app.adapters.hengyang_procurement import HengyangProcurementAdapter
+from app.adapters.zhejiang_procurement import ZhejiangProcurementAdapter
 from app.adapters.registry import build_adapter, resolve_adapter_class
 from app.models import Notice, RawNotice, RawNoticeDetail
 
@@ -139,6 +140,7 @@ class AdapterFrameworkTests(unittest.TestCase):
             HengyangProcurementAdapter,
             ChangshaProcurementAdapter,
             CcgpLocalAdapter,
+            ZhejiangProcurementAdapter,
         ):
             self.assertIsNot(adapter_class.fetch_list, BaseAdapter.fetch_list)
             self.assertIsNot(adapter_class.fetch_detail, BaseAdapter.fetch_detail)
@@ -150,6 +152,7 @@ class AdapterFrameworkTests(unittest.TestCase):
             HengyangProcurementAdapter,
             ChangshaProcurementAdapter,
             CcgpLocalAdapter,
+            ZhejiangProcurementAdapter,
         ):
             adapter = adapter_class(
                 source_name="demo",
