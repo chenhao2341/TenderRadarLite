@@ -80,6 +80,10 @@ reports/latest.html
 
 更完整说明见 [docs/WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md)。
 
+### 4. 本地 Web 控制台 Alpha
+
+可双击 `启动Web控制台.bat` 或运行 `python scripts/start_web_console.py` 打开 `http://127.0.0.1:8765`。当前控制台支持安全触发一次固定的本地扫描入口，默认不触发 Feishu，不调用 AI，仍然不是多用户系统或后台调度系统。
+
 ## 默认安全边界
 
 - Feishu 默认关闭，不是主路径前置条件

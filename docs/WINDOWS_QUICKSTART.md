@@ -2,15 +2,15 @@
 
 ## 适用范围
 
-这份说明面向希望在 Windows 本地运行 TenderRadarLite 并查看本地 HTML 报告的用户。
+本文面向希望在 Windows 本地运行 TenderRadarLite 并查看本地 HTML 报告的用户。
 
-当前主路径是：
+当前主路径仍然是：
 
 - 命令行运行
 - Windows `.bat` 脚本运行
 - 浏览器打开本地 `reports/latest.html`
 
-Web 控制台当前仍是 Alpha 骨架，不应视为完整运行入口。
+另外，当前仓库也提供一个本地 Web 控制台 Alpha。
 
 ## 运行前准备
 
@@ -46,10 +46,10 @@ python run_mvp.py --local-html
 
 说明：
 
-- 默认不会触发 Feishu
-- 默认不会调用 AI
-- 默认不会下载附件
-- 默认不会解析 PDF / DOC / DOCX
+- 默认不触发 Feishu
+- 默认不调用 AI
+- 默认不下载附件
+- 默认不解析 PDF / DOC / DOCX
 
 ## Windows 双击路径
 
@@ -104,48 +104,45 @@ logs/
 - 当前路径是否是 `D:\TenderRadarLite`
 - 运行命令是否包含 `--local-html`
 
-## 如何理解 supported / alpha 来源
-
-当前 `supported` 来源：
-
-- 衡阳公共资源交易平台 / 建设工程交易
-- 衡阳公共资源交易平台 / 政府采购交易
-
-当前默认关闭的 `alpha` 来源：
-
-- 长沙公共资源交易平台 / 长沙政府采购交易
-- 中国政府采购网 / 地方公告
-
-说明：
-
-- `supported`：当前可作为默认可用来源
-- `alpha`：已有 adapter，但不承诺稳定，默认关闭
-- `alpha` 不等于不可用，只是不应作为当前开源版主能力承诺
-
 ## Web 控制台当前状态
 
-当前 Web 控制台是本地只读 / 半只读 Alpha 骨架：
+当前 Web 控制台仍是本地 Alpha，但已经支持一个真实、安全、单次运行的入口。
 
-- 可以看状态、报告入口、日志摘要、来源目录
-- 不能包装成成熟控制台
-- 当前缺真实运行按钮和完整运行闭环
+启动方式：
 
-下一阶段重点见 [docs/WEB_CONSOLE.md](docs/WEB_CONSOLE.md) 与 [docs/ROADMAP.md](docs/ROADMAP.md)。
+```powershell
+python scripts/start_web_console.py
+```
 
-## 常见问题
+或双击：
 
-### 没有飞书配置也能用吗
+```text
+启动Web控制台.bat
+```
 
-可以。默认主路径就是本地 HTML，不依赖 Feishu。
+打开地址：
 
-### 默认会调用 AI 吗
+```text
+http://127.0.0.1:8765
+```
 
-不会。只有显式传入相关 AI 参数时才会启用。
+进入“运行入口”后，可以点击“运行一次本地扫描”。
 
-### 为什么有些来源默认关闭
+该入口固定执行：
 
-因为它们当前是 `alpha` 来源，需要继续做稳定性和字段质量校准。
+```powershell
+python run_mvp.py --local-html --profile design_consulting
+```
 
-### 为什么报告里有些字段为空
+并保持以下边界：
 
-这是当前 Alpha 阶段的正常现象，部分来源仍存在字段完整性风险，详见 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md)。
+- 固定参数
+- 默认不触发 Feishu
+- 默认不调用 AI
+- 不修改 config
+- 不下载附件
+- 不解析 PDF / DOC / DOCX
+- 不是多用户系统
+- 不是后台调度系统
+
+更多说明见 [docs/WEB_CONSOLE.md](docs/WEB_CONSOLE.md)。

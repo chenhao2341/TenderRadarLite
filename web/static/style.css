@@ -161,9 +161,20 @@ button.button {
   font: inherit;
 }
 
+.button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .button.secondary {
   background: #dfe8e4;
   color: var(--accent-strong);
+}
+
+button.button:disabled {
+  background: #9db5b1;
+  cursor: not-allowed;
 }
 
 pre {
@@ -172,6 +183,8 @@ pre {
   border-radius: 16px;
   background: #132725;
   color: #eef7f4;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 ul {
@@ -350,6 +363,24 @@ th {
 
 .error {
   color: #9b1c1c;
+}
+
+.error-banner {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fde8e5;
+  border: 1px solid #f3c5be;
+  color: #9b1c1c;
+}
+
+.run-summary-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.run-summary-grid p {
+  margin: 0;
 }
 
 @media (max-width: 900px) {
