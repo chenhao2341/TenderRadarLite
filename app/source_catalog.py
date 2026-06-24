@@ -15,6 +15,24 @@ ALLOWED_SOURCE_TYPE = {
     "aggregator",
     "unknown",
 }
+ALLOWED_SOURCE_TYPE_HINT = {
+    "json_api",
+    "html_list_detail",
+    "json_portal_flow",
+    "spa_runtime_required",
+    "blocked_captcha",
+    "anti_bot",
+    "candidate_unknown",
+    "planned",
+    "unknown",
+}
+ALLOWED_ACCESS_MODE = {"requests_json", "requests_html", "browser_runtime_required", "blocked", "unknown"}
+ALLOWED_DETAIL_MODE = {"html_detail", "json_detail", "portal_detail_html", "list_only", "unknown"}
+ALLOWED_ORIGINAL_URL_POLICY = {"readable", "mixed", "api_only", "blocked", "unknown"}
+ALLOWED_RAW_API_POLICY = {"available", "partial", "none", "blocked", "unknown"}
+ALLOWED_OBSERVABILITY = {"high", "medium", "low", "unknown"}
+ALLOWED_RECOMMENDED_USAGE = {"default_supported", "manual_alpha_test", "probe_reference", "research_only", "blocked", "planned"}
+ALLOWED_PROBE_REUSE_VALUE = {"high", "medium", "low", "blocked"}
 ALLOWED_YES_NO_UNKNOWN = {"yes", "no", "unknown"}
 ALLOWED_ATTACHMENT = {"yes", "no", "likely", "unknown"}
 ALLOWED_RISK = {"low", "medium", "high", "unknown"}
@@ -84,6 +102,36 @@ def validate_source_catalog(catalog: dict[str, Any]) -> list[str]:
             errors.append(f"{source_id or label}: invalid status '{status}'.")
         if source_type not in ALLOWED_SOURCE_TYPE:
             errors.append(f"{source_id or label}: invalid source_type '{source_type}'.")
+        source_type_hint = str(source.get("source_type_hint") or "").strip()
+        if source_type_hint and source_type_hint not in ALLOWED_SOURCE_TYPE_HINT:
+            errors.append(f"{source_id or label}: invalid source_type_hint '{source_type_hint}'.")
+        access_mode = str(source.get("access_mode") or "").strip()
+        if access_mode and access_mode not in ALLOWED_ACCESS_MODE:
+            errors.append(f"{source_id or label}: invalid access_mode '{access_mode}'.")
+        detail_mode = str(source.get("detail_mode") or "").strip()
+        if detail_mode and detail_mode not in ALLOWED_DETAIL_MODE:
+            errors.append(f"{source_id or label}: invalid detail_mode '{detail_mode}'.")
+        original_url_policy = str(source.get("original_url_policy") or "").strip()
+        if original_url_policy and original_url_policy not in ALLOWED_ORIGINAL_URL_POLICY:
+            errors.append(f"{source_id or label}: invalid original_url_policy '{original_url_policy}'.")
+        raw_api_policy = str(source.get("raw_api_policy") or "").strip()
+        if raw_api_policy and raw_api_policy not in ALLOWED_RAW_API_POLICY:
+            errors.append(f"{source_id or label}: invalid raw_api_policy '{raw_api_policy}'.")
+        freshness_observability = str(source.get("freshness_observability") or "").strip()
+        if freshness_observability and freshness_observability not in ALLOWED_OBSERVABILITY:
+            errors.append(f"{source_id or label}: invalid freshness_observability '{freshness_observability}'.")
+        dedupe_observability = str(source.get("dedupe_observability") or "").strip()
+        if dedupe_observability and dedupe_observability not in ALLOWED_OBSERVABILITY:
+            errors.append(f"{source_id or label}: invalid dedupe_observability '{dedupe_observability}'.")
+        field_observability = str(source.get("field_completeness_observability") or "").strip()
+        if field_observability and field_observability not in ALLOWED_OBSERVABILITY:
+            errors.append(f"{source_id or label}: invalid field_completeness_observability '{field_observability}'.")
+        recommended_usage = str(source.get("recommended_usage") or "").strip()
+        if recommended_usage and recommended_usage not in ALLOWED_RECOMMENDED_USAGE:
+            errors.append(f"{source_id or label}: invalid recommended_usage '{recommended_usage}'.")
+        probe_reuse_value = str(source.get("probe_reuse_value") or "").strip()
+        if probe_reuse_value and probe_reuse_value not in ALLOWED_PROBE_REUSE_VALUE:
+            errors.append(f"{source_id or label}: invalid probe_reuse_value '{probe_reuse_value}'.")
         if str(source.get("has_detail_page") or "").strip() not in ALLOWED_YES_NO_UNKNOWN:
             errors.append(f"{source_id or label}: invalid has_detail_page value.")
         if str(source.get("has_attachments") or "").strip() not in ALLOWED_ATTACHMENT:

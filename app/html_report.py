@@ -16,6 +16,7 @@ from .company_profile import CompanyProfile
 from .models import Notice
 from .opportunity_stage import opportunity_stage_label
 from .source_catalog import load_source_catalog
+from .source_quality import build_source_quality_matrix
 
 
 REPORT_TITLE = "TenderRadarLite 本地招投标线索报告"
@@ -86,6 +87,9 @@ class SourceReportGroup:
 SOURCE_STATUS_LABELS = {
     "supported": "supported",
     "alpha": "alpha",
+    "candidate": "candidate",
+    "planned": "planned",
+    "blocked": "blocked",
     "unknown": "unknown",
 }
 
@@ -100,6 +104,7 @@ def write_html_report(
     company_profile: CompanyProfile | None = None,
     ai_results: dict[str, AIAnalysisResult] | None = None,
     ai_status_message: str = "",
+    run_summaries: Iterable[object] | None = None,
 ) -> Path:
     notice_list = list(notices)
     output_path = path.resolve()
@@ -112,6 +117,7 @@ def write_html_report(
         company_profile=company_profile,
         ai_results=ai_results,
         ai_status_message=ai_status_message,
+        run_summaries=run_summaries,
     )
     output_path.write_text(html_text, encoding="utf-8")
     return output_path
@@ -126,12 +132,17 @@ def build_html_report(
     company_profile: CompanyProfile | None = None,
     ai_results: dict[str, AIAnalysisResult] | None = None,
     ai_status_message: str = "",
+    run_summaries: Iterable[object] | None = None,
 ) -> str:
     timestamp = generated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     projects = aggregate_notices(notices)
     ai_results = ai_results or {}
     project_counts = Counter(item.project_tier for item in projects)
     source_groups = _build_source_groups(notices, projects)
+    source_quality_rows = build_source_quality_matrix(
+        current_run_summaries=run_summaries,
+        report_generated_at=timestamp,
+    )
     stat_cards = [
         ("本轮公告数", str(len(notices)), "本轮抓取并进入本地报告的公告总数"),
         ("聚合项目数", str(len(projects)), "按项目或标段聚合后的展示对象数量"),
@@ -160,6 +171,7 @@ def build_html_report(
                 _render_footer_note(),
             ]
         )
+    source_quality_section = _render_source_quality_matrix(source_quality_rows)
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -310,6 +322,86 @@ def build_html_report(
       font-size: 13px;
       line-height: 1.65;
     }}
+    .quality-matrix {{
+      margin: 0 0 30px;
+      border-radius: 28px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }}
+    .quality-matrix-note {{
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+      max-width: 860px;
+    }}
+    .quality-matrix-wrap {{
+      padding: 0 24px 24px;
+      overflow-x: auto;
+    }}
+    .quality-matrix-table {{
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }}
+    .quality-matrix-table th,
+    .quality-matrix-table td {{
+      padding: 14px 12px;
+      border-top: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      line-height: 1.65;
+    }}
+    .quality-matrix-table th {{
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(252, 248, 241, 0.76);
+      position: sticky;
+      top: 0;
+    }}
+    .quality-source {{
+      min-width: 220px;
+    }}
+    .quality-source strong {{
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }}
+    .quality-source code {{
+      color: var(--muted);
+      font-size: 12px;
+    }}
+    .quality-observation {{
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+    }}
+    .quality-flags {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+    .quality-badge {{
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.72);
+    }}
+    .quality-badge.supported {{ color: var(--direct); background: var(--direct-soft); }}
+    .quality-badge.alpha {{ color: var(--watch); background: var(--watch-soft); }}
+    .quality-badge.candidate,
+    .quality-badge.planned {{ color: #5d4a2a; background: rgba(252, 241, 223, 0.9); }}
+    .quality-badge.blocked {{ color: var(--exclude); background: var(--exclude-soft); }}
+    .quality-badge.unknown {{ color: var(--muted); }}
     .status-banner {{
       margin: 18px 0 0;
       padding: 14px 16px;
@@ -875,6 +967,7 @@ def build_html_report(
     <section class="stats">
       {"".join(_render_stat_card(title, value, note) for title, value, note in stat_cards)}
     </section>
+    {source_quality_section}
     <section class="report-flow">
       {body_sections}
     </section>
@@ -971,6 +1064,109 @@ def _render_status_banner(message: str) -> str:
     if not message:
         return ""
     return f'<section class="status-banner">{_escape(message)}</section>'
+
+
+def _render_source_quality_matrix(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return ""
+    body = "".join(_render_source_quality_row(row) for row in rows)
+    return f"""
+    <section class="quality-matrix">
+      <div class="section-header">
+        <div class="section-heading">
+          <h3 class="section-title">来源质量矩阵</h3>
+          <p class="quality-matrix-note">该矩阵只解释来源状态、默认启用边界、最近一次运行观测和后续 Probe 复用价值，不替代现有公告列表，也不自动提升 alpha/candidate 来源。</p>
+        </div>
+        <div class="section-count">{len(rows)} 个来源条目</div>
+      </div>
+      <div class="quality-matrix-wrap">
+        <table class="quality-matrix-table">
+          <thead>
+            <tr>
+              <th>来源</th>
+              <th>状态 / 启用</th>
+              <th>技术分类</th>
+              <th>最近一次运行</th>
+              <th>新鲜度观测</th>
+              <th>去重观测</th>
+              <th>字段完整性</th>
+              <th>Probe / 使用建议</th>
+              <th>已知风险</th>
+            </tr>
+          </thead>
+          <tbody>{body}</tbody>
+        </table>
+      </div>
+    </section>
+    """
+
+
+def _render_source_quality_row(row: dict[str, object]) -> str:
+    participated = "yes" if row.get("participated_in_latest_run") else "no"
+    fetched = _display_count(row.get("fetched"))
+    inserted = _display_count(row.get("inserted"))
+    duplicates = _display_count(row.get("duplicates"))
+    errors = _display_count(row.get("errors"))
+    latest_site_publish_time = str(row.get("latest_site_publish_time") or "")
+    latest_db_publish_time = str(row.get("latest_db_publish_time") or "")
+    freshness_lines = [
+        f"站点最新时间：{_escape(latest_site_publish_time)}"
+        if latest_site_publish_time
+        else "当前 adapter 未提供 latest_site_publish_time"
+    ]
+    if latest_db_publish_time:
+        freshness_lines.append(f"库内最新时间：{_escape(latest_db_publish_time)}")
+    dedupe_signal = str(row.get("dedupe_signal") or "unknown")
+    dedupe_note = {
+        "stable": "stable: 最近一次以重复为主，未见新的去重异常。",
+        "suspected_realtime_update": "suspected_realtime_update: 存在少量新增，保守视为站点实时更新，不直接判定异常。",
+        "dedupe_anomaly": "dedupe_anomaly: 运行结果与去重预期不一致，需要后续复核。",
+        "unknown": "unknown: 最近一次运行不足以判断去重稳定性。",
+    }.get(dedupe_signal, "unknown: 最近一次运行不足以判断去重稳定性。")
+    freshness_html = "".join(f'<span class="quality-observation">{line}</span>' for line in freshness_lines)
+    return f"""
+    <tr>
+      <td class="quality-source">
+        <strong>{_escape(str(row.get("display_name") or ""))}</strong>
+        <code>{_escape(str(row.get("source_key") or ""))}</code>
+      </td>
+      <td>
+        <div class="quality-flags">
+          <span class="quality-badge {_escape(str(row.get("status") or "unknown"))}">{_escape(str(row.get("status") or "unknown"))}</span>
+          <span class="quality-badge">default_enabled={_bool_label(bool(row.get("default_enabled")))}</span>
+          <span class="quality-badge">current_enabled={_bool_label(bool(row.get("current_enabled")))}</span>
+          <span class="quality-badge">latest_run={participated}</span>
+        </div>
+      </td>
+      <td>
+        <strong>{_escape(str(row.get("technical_type") or ""))}</strong>
+        <span class="quality-observation">source_type_hint={_escape(str(row.get("source_type_hint") or ""))}</span>
+        <span class="quality-observation">detail_mode={_escape(str(row.get("detail_mode") or ""))}</span>
+      </td>
+      <td>
+        fetched={fetched} / inserted={inserted} / duplicates={duplicates} / errors={errors}
+        <span class="quality-observation">{_escape(str(row.get("detail_observation") or "unknown"))}</span>
+      </td>
+      <td>
+        <strong>{_escape(str(row.get("freshness_level") or "unknown"))}</strong>
+        {freshness_html}
+      </td>
+      <td>
+        <strong>{_escape(str(row.get("dedupe_stability_level") or "unknown"))}</strong>
+        <span class="quality-observation">{_escape(dedupe_note)}</span>
+      </td>
+      <td>
+        <strong>{_escape(str(row.get("field_completeness_level") or "unknown"))}</strong>
+        <span class="quality-observation">original_url_readable={_escape(str(row.get("original_url_readable") or "unknown"))}</span>
+        <span class="quality-observation">raw_api_url_available={_escape(str(row.get("raw_api_url_available") or "unknown"))}</span>
+      </td>
+      <td>
+        <strong>{_escape(str(row.get("recommended_usage") or "unknown"))}</strong>
+        <span class="quality-observation">probe_reuse_value={_escape(str(row.get("probe_reuse_value") or "unknown"))}</span>
+      </td>
+      <td>{_escape(str(row.get("known_risks") or "无"))}</td>
+    </tr>
+    """
 
 
 def _render_company_business_view(items: list[ProjectReportItem], company_profile: CompanyProfile | None) -> str:
@@ -1547,6 +1743,16 @@ def _split_catalog_source_name(value: str) -> tuple[str, str]:
 def _display_source_status(value: str) -> str:
     normalized = (value or "").strip().lower()
     return SOURCE_STATUS_LABELS.get(normalized, "unknown")
+
+
+def _display_count(value: object) -> str:
+    if value in {None, ""}:
+        return "-"
+    return str(value)
+
+
+def _bool_label(value: bool) -> str:
+    return "true" if value else "false"
 
 
 def _normalize_source_subtype(value: str, region: str) -> str:

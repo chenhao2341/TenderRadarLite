@@ -145,6 +145,36 @@ class SourceCatalogTests(unittest.TestCase):
         self.assertNotIn("webhook", serialized.lower())
         self.assertNotIn("api_key", serialized.lower())
 
+    def test_source_quality_fields_cover_supported_alpha_and_reference_samples(self) -> None:
+        catalog = load_source_catalog()
+        expected = {
+            "hengyang-construction": ("supported", True, "html_list_detail"),
+            "hengyang-procurement": ("supported", True, "json_api"),
+            "changsha-procurement": ("alpha", False, "json_api"),
+            "china-government-procurement-local": ("alpha", False, "html_list_detail"),
+            "zhejiang-government-procurement": ("alpha", False, "json_portal_flow"),
+            "chongqing-government-procurement": ("candidate", False, "spa_runtime_required"),
+            "guangdong-government-procurement": ("planned", False, "spa_runtime_required"),
+            "enterprise-procurement-portals": ("blocked", False, "anti_bot"),
+        }
+
+        for source_id, (status, default_enabled, source_type_hint) in expected.items():
+            source = find_source_by_id(catalog, source_id)
+            self.assertIsNotNone(source)
+            self.assertEqual(source["status"], status)
+            self.assertEqual(source["default_enabled"], default_enabled)
+            self.assertEqual(source["source_type_hint"], source_type_hint)
+            self.assertIn(source["recommended_usage"], {"default_supported", "manual_alpha_test", "probe_reference", "planned", "blocked"})
+            self.assertIn(source["probe_reuse_value"], {"high", "medium", "low", "blocked"})
+
+    def test_supported_and_alpha_default_enabled_boundary_is_preserved(self) -> None:
+        catalog = load_source_catalog()
+        supported = list_sources(catalog, status="supported")
+        alpha = list_sources(catalog, status="alpha")
+
+        self.assertTrue(all(item["default_enabled"] is True for item in supported))
+        self.assertTrue(all(item["default_enabled"] is False for item in alpha))
+
 
 if __name__ == "__main__":
     unittest.main()

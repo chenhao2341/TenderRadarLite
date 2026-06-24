@@ -15,6 +15,21 @@ sources:
     supported_notice_types: ["招标公告", "中标候选人公示", "中标结果公告", "更正公告"]
     adapter: app.adapters.hengyang_construction
     status: supported
+    default_enabled: true
+    source_type_hint: html_list_detail
+    technical_type: HTML list + detail
+    access_mode: requests_html
+    detail_mode: html_detail
+    original_url_policy: readable
+    raw_api_policy: partial
+    freshness_observability: medium
+    dedupe_observability: medium
+    field_completeness_observability: medium
+    field_completeness_level: high
+    dedupe_stability_level: unknown
+    known_risks: latest_site_publish_time depends on adapter summary; ordering can still mix older notices.
+    probe_reuse_value: high
+    recommended_usage: default_supported
     industry_profiles: ["design_consulting", "construction"]
     has_detail_page: yes
     has_attachments: likely
@@ -38,6 +53,21 @@ sources:
     supported_notice_types: ["采购公告", "结果公告", "更正公告", "废标公告"]
     adapter: app.adapters.hengyang_procurement
     status: supported
+    default_enabled: true
+    source_type_hint: json_api
+    technical_type: JSON/API
+    access_mode: requests_json
+    detail_mode: json_detail
+    original_url_policy: readable
+    raw_api_policy: available
+    freshness_observability: medium
+    dedupe_observability: medium
+    field_completeness_observability: medium
+    field_completeness_level: medium
+    dedupe_stability_level: unknown
+    known_risks: field quality is weaker than Hengyang Construction and still relies on adapter normalization.
+    probe_reuse_value: high
+    recommended_usage: default_supported
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: yes
     has_attachments: likely
@@ -61,6 +91,21 @@ sources:
     supported_notice_types: ["招标公告"]
     adapter: app.adapters.changsha_procurement
     status: alpha
+    default_enabled: false
+    source_type_hint: json_api
+    technical_type: JSON/API
+    access_mode: requests_json
+    detail_mode: json_detail
+    original_url_policy: readable
+    raw_api_policy: available
+    freshness_observability: medium
+    dedupe_observability: medium
+    field_completeness_observability: medium
+    field_completeness_level: medium
+    dedupe_stability_level: watch
+    known_risks: realtime list updates can resemble dedupe drift; some deadline and summary fields remain incomplete.
+    probe_reuse_value: high
+    recommended_usage: manual_alpha_test
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: yes
     has_attachments: likely
@@ -84,6 +129,21 @@ sources:
     supported_notice_types: ["公开招标", "竞争性磋商", "竞争性谈判", "中标公告", "更正公告"]
     adapter: app.adapters.ccgp_local
     status: alpha
+    default_enabled: false
+    source_type_hint: html_list_detail
+    technical_type: HTML list + detail
+    access_mode: requests_html
+    detail_mode: html_detail
+    original_url_policy: readable
+    raw_api_policy: partial
+    freshness_observability: medium
+    dedupe_observability: high
+    field_completeness_observability: medium
+    field_completeness_level: medium
+    dedupe_stability_level: stable
+    known_risks: detail completeness depends on article type; latest_site_publish_time is available only when adapter summary emits it.
+    probe_reuse_value: high
+    recommended_usage: manual_alpha_test
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: yes
     has_attachments: likely
@@ -105,6 +165,21 @@ sources:
     supported_notice_types: ["采购公告", "中标成交公告", "更正公告", "终止公告"]
     adapter: ""
     status: candidate
+    default_enabled: false
+    source_type_hint: candidate_unknown
+    technical_type: Candidate/unknown
+    access_mode: unknown
+    detail_mode: unknown
+    original_url_policy: unknown
+    raw_api_policy: unknown
+    freshness_observability: low
+    dedupe_observability: low
+    field_completeness_observability: low
+    field_completeness_level: medium
+    dedupe_stability_level: unknown
+    known_risks: catalog-only record; no native adapter or repeat-run evidence yet.
+    probe_reuse_value: medium
+    recommended_usage: probe_reference
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: unknown
     has_attachments: likely
@@ -126,6 +201,21 @@ sources:
     supported_notice_types: ["采购公告", "结果公告", "更正公告"]
     adapter: ""
     status: candidate
+    default_enabled: false
+    source_type_hint: spa_runtime_required
+    technical_type: SPA/runtime required
+    access_mode: browser_runtime_required
+    detail_mode: unknown
+    original_url_policy: mixed
+    raw_api_policy: unknown
+    freshness_observability: low
+    dedupe_observability: low
+    field_completeness_observability: low
+    field_completeness_level: medium
+    dedupe_stability_level: unknown
+    known_risks: runtime-required sample, unsuitable for current requests-only alpha path.
+    probe_reuse_value: medium
+    recommended_usage: probe_reference
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: unknown
     has_attachments: likely
@@ -170,6 +260,21 @@ sources:
     supported_notice_types: ["采购公告", "结果公告", "更正公告"]
     adapter: app.adapters.zhejiang_procurement
     status: alpha
+    default_enabled: false
+    source_type_hint: json_portal_flow
+    technical_type: JSON portal flow
+    access_mode: requests_json
+    detail_mode: portal_detail_html
+    original_url_policy: mixed
+    raw_api_policy: available
+    freshness_observability: medium
+    dedupe_observability: medium
+    field_completeness_observability: medium
+    field_completeness_level: medium
+    dedupe_stability_level: watch
+    known_risks: portal ordering can mix stale notices and detail fields still depend on portal HTML.
+    probe_reuse_value: high
+    recommended_usage: manual_alpha_test
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: yes
     has_attachments: likely
@@ -338,6 +443,21 @@ sources:
     supported_notice_types: ["采购公告", "结果公告", "更正公告"]
     adapter: ""
     status: planned
+    default_enabled: false
+    source_type_hint: spa_runtime_required
+    technical_type: SPA/runtime required
+    access_mode: browser_runtime_required
+    detail_mode: unknown
+    original_url_policy: mixed
+    raw_api_policy: unknown
+    freshness_observability: low
+    dedupe_observability: low
+    field_completeness_observability: low
+    field_completeness_level: unknown
+    dedupe_stability_level: unknown
+    known_risks: research sample only; SPA bundle flow is outside current alpha fetch path.
+    probe_reuse_value: low
+    recommended_usage: planned
     industry_profiles: ["design_consulting", "medical_equipment", "software_it"]
     has_detail_page: unknown
     has_attachments: unknown
@@ -422,6 +542,21 @@ sources:
     supported_notice_types: ["招标公告", "询价公告", "采购公告"]
     adapter: ""
     status: blocked
+    default_enabled: false
+    source_type_hint: anti_bot
+    technical_type: Anti-bot/login
+    access_mode: blocked
+    detail_mode: unknown
+    original_url_policy: blocked
+    raw_api_policy: blocked
+    freshness_observability: low
+    dedupe_observability: low
+    field_completeness_observability: low
+    field_completeness_level: unknown
+    dedupe_stability_level: unknown
+    known_risks: login, anti-bot and business-boundary risks keep this outside current open alpha scope.
+    probe_reuse_value: blocked
+    recommended_usage: blocked
     industry_profiles: ["design_consulting", "software_it"]
     has_detail_page: unknown
     has_attachments: unknown

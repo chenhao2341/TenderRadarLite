@@ -359,6 +359,7 @@ def run_once(
             company_profile=company_profile,
             ai_results=ai_results_by_project,
             ai_status_message=ai_status_message,
+            run_summaries=results,
         )
         if ai_status_message:
             print(ai_status_message)

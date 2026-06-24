@@ -7,6 +7,7 @@ from pathlib import Path
 from app.company_profile import CompanyProfile
 from app.html_report import _company_zone_for_notice, write_html_report
 from app.models import Notice
+from app.source_catalog import find_source_by_id, load_source_catalog
 
 
 class HtmlReportV2Tests(unittest.TestCase):
@@ -47,7 +48,8 @@ class HtmlReportV2Tests(unittest.TestCase):
         )
 
     def _source_group_slice(self, html: str, source_label: str) -> str:
-        start = html.index(source_label)
+        section_start = html.index("按地区与来源查看")
+        start = html.index(source_label, section_start)
         return html[start : start + 1800]
 
     def test_report_aggregates_related_notices_into_one_project_card(self) -> None:
@@ -702,6 +704,59 @@ class HtmlReportV2Tests(unittest.TestCase):
         self.assertNotIn("企业商机视图", html)
         self.assertNotIn("今日优先跟进", html)
         self.assertIn("DIRECT", html)
+
+
+    def test_report_adds_source_quality_matrix_without_breaking_region_source_groups(self) -> None:
+        catalog = load_source_catalog()
+        zhejiang = find_source_by_id(catalog, "zhejiang-government-procurement")
+        ccgp_local = find_source_by_id(catalog, "china-government-procurement-local")
+        changsha = find_source_by_id(catalog, "changsha-procurement")
+        hengyang = find_source_by_id(catalog, "hengyang-construction")
+
+        notice = self._notice(
+            project_name="Matrix Project",
+            suffix="matrix",
+            lead_tier="DIRECT",
+            section_id="section-matrix",
+            notice_type="ZHAOBIAO_NOTICE",
+            publish_time="2026-06-20 10:00:00",
+        )
+        notice.source = hengyang["source"]
+        notice.source_subtype = hengyang["source_subtype"]
+        notice.region = hengyang["region"]
+
+        with tempfile.TemporaryDirectory() as raw_dir:
+            report_path = Path(raw_dir) / "latest.html"
+            write_html_report(
+                report_path,
+                [notice],
+                source_count=2,
+                generated_at="2026-06-20 12:00:00",
+                run_summaries=[
+                    {
+                        "source_name": "Changsha Procurement",
+                        "fetched_count": 10,
+                        "inserted_count": 1,
+                        "duplicate_count": 9,
+                        "error_count": 0,
+                        "detail_success_count": 10,
+                        "latest_site_publish_time": "2026-06-20 10:00:00",
+                        "latest_db_publish_time": "2026-06-20 10:00:00",
+                    }
+                ],
+            )
+            html = report_path.read_text(encoding="utf-8")
+
+        self.assertIn("来源质量矩阵", html)
+        self.assertIn(zhejiang["name"], html)
+        self.assertIn(ccgp_local["name"], html)
+        self.assertIn(changsha["name"], html)
+        self.assertIn(hengyang["name"], html)
+        self.assertIn("source_type_hint=json_portal_flow", html)
+        self.assertIn("source_type_hint=html_list_detail", html)
+        self.assertIn("suspected_realtime_update", html)
+        self.assertIn("当前 adapter 未提供 latest_site_publish_time", html)
+        self.assertIn("按地区与来源查看", html)
 
 
 class CompanyBusinessZoneTests(unittest.TestCase):
