@@ -1,6 +1,6 @@
 # Known Limitations
 
-TenderRadarLite 当前是本地优先的 `v0.1-alpha`。以下限制应被视为公开边界的一部分，而不是隐藏细节。
+TenderRadarLite 当前是本地优先的 `v0.1-alpha` / Developer Preview。以下限制应被视为公开边界的一部分，而不是隐藏细节。
 
 ## 来源与字段质量
 
@@ -14,16 +14,24 @@ TenderRadarLite 当前是本地优先的 `v0.1-alpha`。以下限制应被视为
 
 - Feishu 是可选集成，不是默认主路径。
 - AI 分析是可选 Alpha，不是成熟业务判断系统。
+- `alpha` 来源默认关闭。
+- Source Probe 尚未实现。
 - 当前不下载附件。
-- 当前不解析 PDF / DOC / DOCX。
+- 当前不解析附件级 PDF / DOC / DOCX / XLS。
+- 当前不支持高并发抓取。
+- 当前不支持强反爬对抗。
 - 当前不做自动投标。
+- 当前不提供企业私有化完整交付。
 
 ## 产品与适用范围边界
 
 - 当前不承诺全国稳定覆盖。
+- 当前不承诺生产可用。
 - 当前不承诺普通非技术用户零门槛使用。
 - 当前不绕过登录 / 验证码 / 反爬。
-- 当前 Web 控制台仍是 Alpha 骨架，不是完整运行入口。
+- 当前 `latest_site_publish_time` 不是所有 adapter 都提供。
+- 当前 `dedupe_signal` 仍是 Alpha 解释规则。
+- 当前 Web 控制台虽可作为真实本地运行入口，但整体仍处于 Alpha / Developer Preview 阶段。
 
 ## 如何理解这些限制
 
