@@ -1,10 +1,38 @@
-# TenderRadarLite
+# TenderRadarLite｜招标雷达轻量版
 
-TenderRadarLite 是一个本地优先的招投标线索发现与字段质量审计 Alpha 工具。
+本地优先的招投标线索发现与来源质量审计 Alpha 工具。
 
 当前状态：`v0.1-alpha` / Developer Preview。
 
 它当前用于本地研究、学习、作品集展示和内部流程验证，面向的是“本地抓取公开公告、做结构化去重、查看本地 HTML 报告、持续校准字段质量”的工程化使用场景，不是成熟 SaaS，不是生产级系统，也不是全国招投标平台。
+
+关键词：招投标线索监控、招标信息监控、政府采购公告、本地 HTML 报告、来源质量审计、Source Catalog、Source Quality Matrix、AI-assisted Coding、招标雷达轻量版。
+
+## 界面预览
+
+### 本地报告概览
+
+![本地报告概览](docs/assets/report-overview.png)
+
+受控本地 HTML 报告首页示例，用于说明公告数、聚合项目数与 `DIRECT / WATCHLIST / EXCLUDE` 分层，不代表全国稳定覆盖。
+
+### 来源质量矩阵
+
+![来源质量矩阵](docs/assets/source-quality-matrix.png)
+
+矩阵用于解释 `supported / alpha` 等来源状态与观测质量边界，不等于默认启用全部来源。
+
+### DIRECT 项目卡片
+
+![DIRECT 项目卡片](docs/assets/direct-project-card.png)
+
+示例卡片展示字段整理、标签归类与人工复核入口，仍属于 Alpha 阶段的本地报告能力。
+
+### 本地 Web 控制台 Alpha
+
+![本地 Web 控制台 Alpha](docs/assets/web-console.png)
+
+控制台截图仅展示本地运行入口与状态概览；默认安全模式下不触发 Feishu，不调用 AI。
 
 ## 当前不是
 
@@ -153,10 +181,10 @@ reports/latest.html
 
 ## 示例材料
 
-当前仓库未提交真实运行截图。
+当前仓库已补充公开 README 使用的脱敏截图。
 
-- 如需补展示材料，请参考 [docs/assets/README.md](docs/assets/README.md)
-- 示例截图待补充
+- 截图素材约束见 [docs/assets/README.md](docs/assets/README.md)
+- 未纳入的高风险或低价值截图不随仓库提交
 
 ## 项目结构
 

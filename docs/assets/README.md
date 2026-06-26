@@ -1,17 +1,20 @@
-# Docs Assets Placeholder
+# docs/assets
 
-当前仓库未提交真实运行截图。
+该目录用于存放 README 使用的脱敏截图和示例图片。
 
-如后续补示例材料，建议仅放安全脱敏截图，并按以下占位组织：
+允许放入：
 
-- `report-overview.png`
-- `source-grouping.png`
-- `item-card.png`
-- `web-console-alpha.png`
+- 脱敏后的报告首页截图
+- 脱敏后的来源质量矩阵截图
+- 脱敏后的 Web 控制台截图
+- 脱敏后的项目卡片截图
 
-注意：
+禁止放入：
 
-- 不要提交包含真实敏感数据的截图
-- 不要提交包含真实 Key / Secret / Webhook / Token 的截图
-- 不要提交从 `reports/latest.html` 直接截出的敏感样本
-- 当前可在 README 或 Release Notes 中写“示例截图待补充”
+- `.env`
+- API key / token / webhook
+- `data/bids.db`
+- `reports/latest.html`
+- 真实 logs
+- 未脱敏截图
+- 真实客户或隐私数据
